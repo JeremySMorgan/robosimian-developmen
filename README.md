@@ -1,7 +1,7 @@
 # robosimian-development
 
+## About
+Walking gait for JPL's Robosimian quadruped robot. Uses Klamp't (http://motion.pratt.duke.edu/klampt/) for simulation, ik, and modeling
 
-### $PS1
-``` C
-\[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\n\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\W\n\[\033[00m\] >
-```
+
+[![robosimian forward gait](https://www.youtube.com/watch?v=yeAvKYfvZMc/0.jpg)](https://www.youtube.com/watch?v=yeAvKYfvZMc "robosimian forward gait")

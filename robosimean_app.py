@@ -9,7 +9,6 @@ def main():
     robot_hypervisor.start()
     robot_hypervisor.run_visualization()
 
-
 if __name__ == "__main__":
     main()
 

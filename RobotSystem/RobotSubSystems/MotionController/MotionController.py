@@ -28,35 +28,101 @@ class MotionController(object):
         self.b_r_foot = self.robosimian.link(self.RobotUtils.b_r_active_dofs[len(self.RobotUtils.b_r_active_dofs) - 1])
         self.b_l_foot = self.robosimian.link(self.RobotUtils.b_l_active_dofs[len(self.RobotUtils.b_l_active_dofs) - 1])
 
+    def setInitalConfig(self):
 
-    def setRobotConfig(self,q):
+        # Get configuration array
+        q = self.robosimian.getConfig()
+
+        # Set joints to 0
+        for i in range(len(q)):
+            q[i] = 0
+
+        link2_offset_indexes = [8,16,24,32]
+        link4_offset_indexes = [10,18,26,34]
+
+        pos_sign = [1,-1,1,-1]
+        neg_sign = [-1,1,-1,1]
+
+        for i in range(len(link2_offset_indexes)):
+            q[link2_offset_indexes[i]] = pos_sign[i] * self.RobotUtils.LIMB1_START_CONFIG_OFFSET
+
+        for i in range(len(link4_offset_indexes)):
+            q[link4_offset_indexes[i]] = neg_sign[i] * (self.RobotUtils.LIMB1_START_CONFIG_OFFSET + (math.pi/2.0) )
+
         self.robosimian.setConfig(q)
 
 
-    def setInitalConfig(self):
+    def shift_torso_from_global_xyz_translation(self,translation):
 
-        if self.robosimian:
+        active_dofs = []
+        for i in range(6,38):
+            active_dofs.append(i)
 
-            q = self.robosimian.getConfig()
+        torso = self.robosimian.link(self.RobotUtils.TORSO_LINK_INDEX)
 
-            link2_offset_indexes = [8,16,24,32]
-            link4_offset_indexes = [10,18,26,34]
+        f_l = self.f_l_foot
+        f_r = self.f_r_foot
+        b_l = self.b_l_foot
+        b_r = self.b_r_foot
 
-            pos_sign = [1,-1,1,-1]
-            neg_sign = [-1,1,-1,1]
+        # World Leg Positions
+        f_l_global = f_l.getWorldPosition([0, 0, 0])
+        f_r_global = f_r.getWorldPosition([0, 0, 0])
+        b_l_global = b_l.getWorldPosition([0, 0, 0])
+        b_r_global = b_r.getWorldPosition([0, 0, 0])
 
-            for i in range(len(link2_offset_indexes)):
-                q[link2_offset_indexes[i]] = pos_sign[i] * self.RobotUtils.LIMB1_START_CONFIG_OFFSET
+        # Desired Leg orientation
+        desired_orientation = self.RobotUtils.DESIRED_FOOT_ROTATION
 
-            for i in range(len(link4_offset_indexes)):
-                q[link4_offset_indexes[i]] = neg_sign[i] * (self.RobotUtils.LIMB1_START_CONFIG_OFFSET + (math.pi/2.0) )
+        # ik obkectives
+        f_l_r_const = ik.objective(f_l, R=desired_orientation, t=f_l_global)
+        f_r_r_const = ik.objective(f_r, R=desired_orientation, t=f_r_global)
+        b_l_r_const = ik.objective(b_l, R=desired_orientation, t=b_l_global)
+        b_r_r_const = ik.objective(b_r, R=desired_orientation, t=b_r_global)
 
-            self.robosimian.setConfig(q)
+        torso_obj = ik.objective(torso, R=torso.getTransform()[0], t=translation)
 
+        goal = [f_l_r_const, f_r_r_const, b_l_r_const, b_r_r_const, torso_obj]
+
+        if ik.solve(goal):
+            pass
         else:
-            status_message =  "robosimian is of type:",type(self.robosimian)
-            self.RobotUtils.ColorPrinter(self.__class__.__name__, status_message, "FAIL")
+            self.RobotUtils.ColorPrinter(self.__class__.__name__, "torso ik failure", "FAIL")
 
+
+    def make_torso_shift_from_local_xyz_translation(self, xyz_translation):
+
+        # Time calculations
+        step_time = self.RobotUtils.TORSO_SHIFT_TIME
+        delay = self.RobotUtils.SIMULATION_FRAME_DELAY
+        i_max = int(float(step_time) / float(delay))
+
+        global_xyz_start = self.MotionPlanner.get_world_xyz_from_local_xyz([0,0,0])
+        global_xyz_end = self.MotionPlanner.get_world_xyz_from_local_xyz(xyz_translation)
+
+        start_x = global_xyz_start[0]
+        start_y = global_xyz_start[1]
+        start_z = global_xyz_start[2]
+
+        end_x = global_xyz_end[0]
+        end_y = global_xyz_end[1]
+        end_z = global_xyz_end[2]
+
+        x_delta = end_x - start_x
+        y_delta = end_y - start_y
+        z_delta = end_z - start_z
+
+        for i in range(i_max):
+
+            global_x = start_x + ((float(i)/float(i_max)) * x_delta)
+            global_y = start_y  + ((float(i)/float(i_max)) * y_delta)
+            global_z = start_z  + ((float(i)/float(i_max)) * z_delta)
+
+            global_xyz = [global_x, global_y, global_z]
+
+            self.shift_torso_from_global_xyz_translation(global_xyz)
+
+            time.sleep(self.RobotUtils.SIMULATION_FRAME_DELAY)
 
 
     def make_leg_step(self, end_affector_name, start_leg_state, end_leg_state):
@@ -108,7 +174,6 @@ class MotionController(object):
         # Retrieve appropriate variables
         link = self.get_foot_from_foot_name(end_affector_name)
         active_dofs = self.get_active_dofs_from_foot_name(end_affector_name)
-        print "active dofs:",active_dofs
         desired_orientation = self.RobotUtils.DESIRED_FOOT_ROTATION
 
         # Time calculations

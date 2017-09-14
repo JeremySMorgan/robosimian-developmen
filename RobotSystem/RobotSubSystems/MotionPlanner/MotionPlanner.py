@@ -110,14 +110,6 @@ class MotionPlanner():
 
 
 
-    def get_foot_world_pos_xyz(self,foot_name):
-
-        foot = self.get_foot_from_foot_name(foot_name)
-
-        return foot.getWorldPosition([0,0,0])
-
-
-
     def get_local_foot_base_state_from_foot_name(self, foot_name):
         
         if not foot_name in self.RobotUtils.end_affectors:
@@ -137,6 +129,8 @@ class MotionPlanner():
             base_foot_state = self.local_f_r_foot_base_state
 
         return base_foot_state
+
+
 
 
     def get_foot_from_foot_name(self,foot_name):

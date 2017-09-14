@@ -49,9 +49,11 @@ class RobotUtils(object):
 
 
     # Step Constants
+    TORSO_SHIFT_DELTA = .15
+    TORSO_SHIFT_TIME = 1.5
     STEP_X_DELTA = .2
     STEP_Z_MAX_HIEGHT = .15
-    STEP_TIME = 2
+    STEP_TIME = .5
     DESIRED_FOOT_ROTATION = [0, 0, -1.0, 0, 1, 0, 1, 0, 0]
 
 
