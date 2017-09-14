@@ -5,7 +5,9 @@ Walking gait for JPL's Robosimian quadruped robot. Uses Klamp't (http://motion.p
 
 ## Media
 
-![alt text](https://github.com/JeremySMorgan/robosimian-gait-development/blob/master/robosimian.png "Start Cofiguration")
+#### video
+www.youtube.com/watch?v=yeAvKYfvZMc
 
-
-Youtube: www.youtube.com/watch?v=yeAvKYfvZMc
+#### Image
+Image of the simulated robot in its start configuration
+![alt text](https://github.com/JeremySMorgan/robosimian-gait-development/blob/master/robosimian.png "Start Cofiguration" =600x800)
