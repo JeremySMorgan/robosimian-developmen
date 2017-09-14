@@ -40,11 +40,11 @@ class Hypervisor():
         # Initialize Visualization
         self.initialize_visualization(world)
 
-        # Add visualizations items for debugging
-        self.addVisualizationItems()
-
         # Save a copy of the robot locally
         self.robosimian = world.robot(0)
+
+        # Add visualizations items for debugging
+        self.addVisualizationItems()
 
         # Create MotionController
         self.MotionController = MotionController(self.robosimian, RobotUtils)
@@ -54,24 +54,19 @@ class Hypervisor():
         self.MotionPlanner = MotionPlanner(self.robosimian,RobotUtils)
         self.MotionPlanner.save_base_foot_states()
 
-        for leg in RobotUtils.end_affectors:
-            for direction in [RobotUtils.FORWARD, RobotUtils.BACKWARD]:
-                name = leg + ":"+direction
-                res = self.MotionPlanner.get_extended_foot_local_XYZ(leg, direction)
-                vis.add(name, res)
+        # Pass the Motion Controller the MotionPlanner
+        self.MotionController.initialize_motion_planner(self.MotionPlanner)
 
         RobotUtils.ColorPrinter(self.__class__.__name__,"Hypervisor initialization finished","OKBLUE")
 
 
     def addVisualizationItems(self):
-        points = [[1,0,0],[0,1,0]]
-        for point in points:
-            label = "testpoint at",point
-            vis.add(str(label),point)
+        pass
+
 
     def initialize_visualization(self,world):
         vis.add("world", world)
-        vis.add("coordinates", coordinates.manager())
+        #vis.add("coordinates", coordinates.manager())
         vp = vis.getViewport()
         vp.w, vp.h = 1600, 1600
         vis.setViewport(vp)
@@ -79,53 +74,27 @@ class Hypervisor():
         vis.autoFitCamera()
         vis.show()
 
-
-
     def run_visualization(self):
 
-        i_max = 250
+        f_r = RobotUtils.F_R_FOOT
+        f_l = RobotUtils.F_L_FOOT
+        b_r = RobotUtils.B_R_FOOT
+        b_l = RobotUtils.B_L_FOOT
 
-        foot_name = RobotUtils.F_R_FOOT
-        direction = RobotUtils.FORWARD
-        start_xyz = self.MotionPlanner.f_r_foot_base_state
-        end_xyz = self.MotionPlanner.get_extended_foot_local_XYZ( foot_name, direction)
-        link = self.MotionPlanner.get_foot_from_foot_name(foot_name)
-        active_dofs = RobotUtils.f_r_active_dofs
-        done = False
+        base_state = RobotUtils.LEG_BASE_STATE
+        f_extend_state = RobotUtils.LEG_F_EXTEND_STATE
+
+        self.MotionController.make_leg_step( f_r, base_state, f_extend_state )
+        self.MotionController.make_leg_step( b_l, base_state, f_extend_state )
+        self.MotionController.make_leg_step(b_r, base_state, f_extend_state)
+        self.MotionController.make_leg_step(f_l, base_state, f_extend_state)
 
         while RobotUtils.SIMULATION_ENABLED:
 
-            if not done:
-                for i in range(i_max):
+            # Update model
+            vis.lock()
+            vis.unlock()
 
-                    # Update model
-                    vis.lock()
-
-                    xyz_des = self.MotionPlanner.get_mid_step_local_XYZ(foot_name, direction, start_xyz, end_xyz, i, i_max)
-                    ik_local = [0, 0, 0]
-                    goal = ik.objective(link, local=ik_local, world=xyz_des)
-                    ik.solve(goal, activeDofs=active_dofs)
-                    vis.unlock()
-
-
-                    time.sleep(RobotUtils.SIMULATION_FRAME_DELAY)
-                    if not vis.shown():
-                        sys.exit()
-                done = True
-
-
-        vis.lock()
-        vis.unlock()
-
-        time.sleep(RobotUtils.SIMULATION_FRAME_DELAY)
-        if not vis.shown():
-            sys.exit()
-
-
-'''
-xyz_des = getXYZfromPath(i, i_max, f_r_foot_world_pos, target_destination)
-ik_local = [0, 0, 0]
-goal = ik.objective(f_r_foot, local=ik_local, world=xyz_des)
-ik.solve(goal, activeDofs=f_r_active_dofs)
-i += 1
-'''
+            time.sleep(RobotUtils.SIMULATION_FRAME_DELAY)
+            if not vis.shown():
+                sys.exit()
