@@ -10,4 +10,4 @@ www.youtube.com/watch?v=yeAvKYfvZMc
 
 #### Image
 Image of the simulated robot in its start configuration
-<img src="https://github.com/JeremySMorgan/robosimian-gait-development/blob/master/robosimian.png" width="600" height="800" />
+<img src="https://github.com/JeremySMorgan/robosimian-gait-development/blob/master/robosimian.png"/>
