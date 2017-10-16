@@ -1,5 +1,7 @@
 #!/usr/bin/python
+import math
 from klampt.math import so3
+from klampt import vis
 
 
 class MotionPlanner():
@@ -26,27 +28,19 @@ class MotionPlanner():
         self.b_r_foot = self.robosimian.link(self.RobotUtils.b_r_active_dofs[len(self.RobotUtils.b_r_active_dofs) - 1])
         self.b_l_foot = self.robosimian.link(self.RobotUtils.b_l_active_dofs[len(self.RobotUtils.b_l_active_dofs) - 1])
 
-    def get_mid_step_global_xyz(self, startXYZ, endXYZ, i, i_max):
 
-        local_xyz = self.get_mid_step_local_xyz(startXYZ,endXYZ,i,i_max)
-
-        global_xyz = self.get_world_xyz_from_local_xyz(local_xyz)
-
-        return global_xyz
-
-
-    def get_mid_step_local_xyz(self, startXYZ, endXYZ, i, i_max):
+    def get_linear_mid_motion_xyz(self, startXYZ, endXYZ, i, i_max):
 
         # prevents division by 0
         if i == 0: i = 1
 
-        x_start = startXYZ[0]
-        y_start = startXYZ[1]
-        z_start = startXYZ[2]
+        x_start = float(startXYZ[0])
+        y_start = float(startXYZ[1])
+        z_start = float(startXYZ[2])
 
-        x_end = endXYZ[0]
-        y_end = endXYZ[1]
-        z_end = endXYZ[2]
+        x_end = float(endXYZ[0])
+        y_end = float(endXYZ[1])
+        z_end = float(endXYZ[2])
 
         y_delta = y_end - y_start
         y = float(i)/float(i_max) * y_delta
@@ -55,27 +49,89 @@ class MotionPlanner():
         x = float(i)/float(i_max) * x_delta
 
         # Arc height
-        h = self.RobotUtils.STEP_Z_MAX_HIEGHT
+        h = float(self.RobotUtils.STEP_Z_MAX_HIEGHT)
         b = x_delta
 
         # see https://www.desmos.com/calculator/v8wb6o83jh
         z_offset =  ((-4*h)/(b**2)) * x * (x-b)
 
-        #print "x:",x,"\ty:",z_offset,"\t\tb:",b,"\th:",h
+        # print "x:",x,"\ty:",z_offset,"\t\tb:",b,"\th:",h
 
         res = [ x_start + x, y_start + y , z_start + z_offset ]
 
         return res
 
 
+    # TODO: make funtion return correctly rotated foot rotation
+    def get_desired_foot_rotation(self, foot_name):
+
+        # Rotation about z = [ cos(a) -sin(a) 0
+        #                      sin(a)  cos(a) 0
+        #                                     1 ]
+
+        robot_yaw = self.robosimian.getConfig()[3]
+
+        #print "right leg rotation:",so3.axis_angle(RIGHT_LEG_DESIRED_FOOT_ROTATION)
+
+        #rotation = [ 0, 0, -1.0,   0,  1, 0,   1, 0, 0]
+
+        '''
+        link = self.get_foot_from_foot_name(foot_name)
+
+        link_local_xyz = link.getLocalPosition([ 0, 0, 0])
+        link_local_x = link_local_xyz[0]
+        link_local_y    = link_local_xyz[1]
+
+        theta = math.atan( link_local_y / link_local_x )
+
+        if theta < 0:
+            theta = (2*3.141592 + theta)
+
+        print foot_name,"theta: ",theta
+        so3_rotation_axis = [0, 1, 0]
+        rotation = so3.rotation(so3_rotation_axis, (1.529/2.0) )
+
+        return rotation'''
+
+
+        if foot_name in self.RobotUtils.left_feet:
+            LEFT_LEG_DESIRED_FOOT_ROTATION = [0, 0, -1.0, 0, -1, 0, -1, 0, 0]
+            return LEFT_LEG_DESIRED_FOOT_ROTATION
+
+        else:
+            RIGHT_LEG_DESIRED_FOOT_ROTATION =   [ 0, 0, -1.0,   0,  1, 0,   1, 0, 0]
+            return RIGHT_LEG_DESIRED_FOOT_ROTATION
+
+
+
+    def get_desired_torso_R_from_yaw_offset(self, yaw_offset_deg):
+
+
+        torso = self.robosimian.link(self.RobotUtils.TORSO_LINK_INDEX)
+
+        current_torso_current_r = torso.getTransform()[0]
+        torso_current_axis_angle = so3.axis_angle(current_torso_current_r)
+        current_torso_yaw_rad = torso_current_axis_angle[1]
+
+        desired_torso_yaw_rad = current_torso_yaw_rad + math.radians(yaw_offset_deg)
+
+        print "current degree:",math.degrees(current_torso_yaw_rad),"\toffset:",yaw_offset_deg,"\t","desired degree:",math.degrees(desired_torso_yaw_rad)
+
+        axis_angle = ( [0,0,1], desired_torso_yaw_rad)
+
+        desired_r = so3.from_axis_angle( axis_angle )
+
+        return desired_r
+
 
     def get_world_xyz_from_local_xyz(self,local_xyz):
-
 
         torso = self.robosimian.link(self.RobotUtils.TORSO_LINK_INDEX)
 
         R = torso.getTransform()[0]
         T = torso.getTransform()[1]
+
+        #print "in get_world_xyz_from_local_xyz, local_xyz:",local_xyz
 
         rotated_point = so3.apply(R, local_xyz)
 
@@ -83,6 +139,46 @@ class MotionPlanner():
 
         return translated_and_rotated_point
 
+
+    # TODO: make funtion return foot rotation from future torso rotation
+    def get_local_turn_desitination(self, foot_name, direction, offset=None):
+
+        if direction not in [self.RobotUtils.LEFT, self.RobotUtils.RIGHT]:
+            print_str = "Error: "+direction+" unrecognized"
+            self.RobotUtils.ColorPrinter(self.__class__.__name__, print_str , "FAIL")
+
+        degree_correction = 0
+        if foot_name == self.RobotUtils.F_R_FOOT:
+            degree_correction = -90
+        elif foot_name == self.RobotUtils.B_R_FOOT:
+            degree_correction = 90
+
+        P0 = self.get_local_foot_base_state_from_foot_name(foot_name)
+
+        P0_x = P0[0]
+        P0_y = P0[1]
+        P0_z = P0[2]
+
+        P0_xy_len = math.sqrt( P0_x**2 +P0_y**2  )
+
+        phi = math.degrees(math.acos( P0_x / P0_xy_len )) + degree_correction
+
+        if offset == None:
+            phi_offset = self.RobotUtils.TORSO_YAW_ROTATE_ANGLE
+        else:
+            phi_offset = offset
+
+        if direction == self.RobotUtils.LEFT:
+            phi_des = phi + phi_offset
+        else:
+            phi_des = phi - phi_offset
+
+        phi_des_rads = math.radians(phi_des)
+
+        des_x = P0_xy_len * math.cos(phi_des_rads)
+        des_y = P0_xy_len * math.sin(phi_des_rads)
+
+        return [des_x, des_y, P0_z]
 
     # Saves the foot positions when the robot is located at the origin
     def save_base_foot_states(self):
@@ -109,7 +205,6 @@ class MotionPlanner():
         return xyz
 
 
-
     def get_local_foot_base_state_from_foot_name(self, foot_name):
         
         if not foot_name in self.RobotUtils.end_affectors:
@@ -132,11 +227,11 @@ class MotionPlanner():
 
 
 
-
     def get_foot_from_foot_name(self,foot_name):
         
         if not foot_name in self.RobotUtils.end_affectors:
-            self.RobotUtils.ColorPrinter(self.__class__.__name__,"Error: foot name unrecognized","FAIL")
+            print_str = "Error: "+foot_name+" unrecognized"
+            self.RobotUtils.ColorPrinter(self.__class__.__name__,print_str,"FAIL")
             return None
 
         if foot_name == self.RobotUtils.B_L_FOOT:

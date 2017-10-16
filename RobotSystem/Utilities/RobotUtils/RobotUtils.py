@@ -24,11 +24,12 @@ class RobotUtils(object):
     b_l_active_dofs = [23,24,25,26,27,28,29]
 
 
-    # App Wide constants used to convey function intent
+    # robot states
     FORWARD = "FORWARD"
     BACKWARD = "BACKWARD"
     LEFT = "LEFT"
     RIGHT = "RIGHT"
+    BASE_STATE = "BASE_STATE"
 
     F_R_FOOT = "F_R_FOOT"
     F_L_FOOT = "F_L_FOOT"
@@ -39,27 +40,61 @@ class RobotUtils(object):
     LEG_F_EXTEND_STATE = "LEG_F_EXTEND"
     LEG_B_EXTEND_STATE = "LEG_B_EXTEND"
 
-    directions = [FORWARD,BACKWARD,LEFT,RIGHT]
+    robot_states = [FORWARD, BACKWARD, LEFT, RIGHT]
+    robot_turning_States = [LEFT, RIGHT]
+
+    left_feet = [F_L_FOOT, B_L_FOOT]
+    right_feet = [F_R_FOOT, B_R_FOOT]
     end_affectors = [ F_R_FOOT, F_L_FOOT, B_R_FOOT, B_L_FOOT]
     leg_states = [LEG_B_EXTEND_STATE,LEG_BASE_STATE,LEG_F_EXTEND_STATE]
 
 
-    # Robot Configuration Constants
-    LIMB1_START_CONFIG_OFFSET = math.pi / 4
+    # App wide multithreading constants
+    KEEP_THREAD_ALIVE                   = "thread_is_alive"
 
+    # Gamepad input
+    GAMEPAD_LEAST_SIGNIFICANT_INPUT     = .01
+
+    # Objective Planner
+    OBJECTIVE_PLANNER_UPDATE_DELAY     = .05
+
+    # Debugging
+    OBJ_PLANNER_DEBUGGING_ENABLED               = True
+    GAMEPAD_DEBUGGING_ENABLED                   = False
+    HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED = True
+    MOTION_THREAD_DEBUGGING_ENABLED             = True
+
+    # Delay Constants
+    CONTROLLER_DT               = .01
+    GAMEPAD_UPDATE_DELAY        = .01
+    SIMULATION_FRAME_DELAY      = .01
+
+    # Global IK constants
+    IK_MAX_DEVIATION            = 1
+
+    # Robot Configuration Constants
+    LIMB1_START_CONFIG_OFFSET   = math.pi / 4
+
+    # Reset Constants
+    RESET_LEG_STEP_TIME         = 2
+    MINIMUM_X_DELTA             = .005
+    MINIMUM_Y_DELTA             = .005
+    MINIMUM_Z_DELTA             = .005
+
+    # Turn Constants
+    TURN_TIME                   = 2
+    TORSO_YAW_ROTATE_TIME       = 3
+    TORSO_YAW_ROTATE_ANGLE      = 15
 
     # Step Constants
-    TORSO_SHIFT_DELTA = .15
-    TORSO_SHIFT_TIME = 1.5
-    STEP_X_DELTA = .2
-    STEP_Z_MAX_HIEGHT = .15
-    STEP_TIME = .5
-    DESIRED_FOOT_ROTATION = [0, 0, -1.0, 0, 1, 0, 1, 0, 0]
-
+    TORSO_SHIFT_TIME            = 2
+    STEP_X_DELTA                = .2
+    STEP_Z_MAX_HIEGHT           = .15
+    TORSO_SHIFT_DELTA           = STEP_X_DELTA
+    STEP_TIME                   = 2
 
     # Simulation constants
-    SIMULATION_FRAME_DELAY = .005
-    SIMULATION_ENABLED = True
+    SIMULATION_ENABLED          = True
 
 
     @staticmethod
