@@ -17,7 +17,7 @@ class MotionThread(object):
     def start(self):
 
 
-        # Pass function self with no other arguments
+        # Pass thread target function self
         if self.pass_motion_thread:
             self.thread = threading.Thread(target=self.function_name, name=self.thread_name,
                                            args=(self,), )

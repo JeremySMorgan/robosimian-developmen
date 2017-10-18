@@ -3,6 +3,9 @@
 import sys
 import time
 
+import math
+
+
 from klampt import *
 from klampt.model import coordinates
 
@@ -17,9 +20,10 @@ if RobotUtils.SIMULATION_ENABLED:
 
 class Hypervisor():
 
-    def __init__(self,robot_file):
+    def __init__(self,robot_file, world_file):
 
         self.robot_file = robot_file
+        self.world_file = world_file
         self.robosimian = None
         self.world = None
         self.MotionController = None
@@ -28,19 +32,23 @@ class Hypervisor():
     def start(self):
 
         world = WorldModel()
+
         res = world.readFile(self.robot_file)
         if not res:
             raise RuntimeError("Unable to load model")
 
+        if RobotUtils.INCLUDE_TERRAIN:
+            terrain = world.readFile(self.world_file)
+            if not terrain:
+                raise RuntimeError("Unable to load plane")
+
+
+
         coordinates.setWorldModel(world)
 
-        # Initialize Visualization
         self.initialize_visualization(world)
 
-        # Save a copy of the robot locally
         self.robosimian = world.robot(0)
-
-        # add world to visualization
 
         # save the simulation
         self.sim =  Simulator(world)
@@ -56,23 +64,27 @@ class Hypervisor():
 
         # Create HighLevelMotionController
         self.MotionPlanner = MotionPlanner(self.robosimian,RobotUtils)
-        self.MotionPlanner.save_base_foot_states()
 
         # Pass the Motion Controller the MotionPlanner
         self.HighLevelMotionController.initialize_motion_planner(self.MotionPlanner)
 
         # User Input
         self.UserInput = UserInput(RobotUtils)
-        self.UserInput.start()
 
         # Objective Manager
         self.ObjectiveManager = ObjectiveManager(RobotUtils, self.MotionPlanner, self.HighLevelMotionController, self.UserInput )
 
         RobotUtils.ColorPrinter(self.__class__.__name__,"Hypervisor initialization finished","OKBLUE")
 
+        valid_run = True
+
         try:
 
-            self.ObjectiveManager.start_objective_management_loop()
+            if valid_run:
+
+                self.UserInput.start()
+                self.ObjectiveManager.start_objective_management_loop()
+                self.run_visualization()
 
             while 1:
                 time.sleep(1)
@@ -80,9 +92,18 @@ class Hypervisor():
         except KeyboardInterrupt:
             self.shutdown()
 
+
+
+
+
     def rotate_torso_yaw(self):
         q = self.robosimian.getConfig()
-        q[3] += 3.141592/4
+        q[3] = 3.141592/6
+        self.robosimian.setConfig(q)
+
+    def shift_x(self):
+        q = self.robosimian.getConfig()
+        q[0] -= .75
         self.robosimian.setConfig(q)
 
     def shutdown(self):
@@ -101,7 +122,6 @@ class Hypervisor():
             vp = vis.getViewport()
             vp.w, vp.h = 800, 800
             vis.setViewport(vp)
-            #vis.listItems(indent=4)
             vis.autoFitCamera()
             vis.show()
 
@@ -113,9 +133,57 @@ class Hypervisor():
             # Update model
             vis.lock()
 
+            if RobotUtils.PHYSICS_ENABLED:
+                self.HighLevelMotionController.control_loop()
 
             vis.unlock()
 
-            time.sleep(RobotUtils.SIMULATION_FRAME_DELAY)
+            if RobotUtils.PHYSICS_ENABLED:
+                self.sim.updateWorld()
+                self.sim.simulate(RobotUtils.CONTROLLER_DT)
+
+            time.sleep(RobotUtils.CONTROLLER_DT)
             if not vis.shown():
                 sys.exit()
+
+
+
+
+
+
+
+
+
+
+"""
+            self.shift_x()
+            self.rotate_torso_yaw()
+
+            for i in range(30):
+                self.HighLevelMotionController.rotate_torso_from_yaw_offset(1)
+                time.sleep(.1)
+
+            for i in range(50):
+                self.HighLevelMotionController.rotate_torso_from_yaw_offset(-1)
+                time.sleep(.1)
+
+"""
+
+
+
+"""
+            self.rotate_torso_yaw()
+
+            link = RobotUtils.F_L_FOOT
+
+            translation = [0, 0, 0]
+
+            for yaw_offset in range(1, 120, 20):
+
+                calculated_new_des = self.MotionPlanner.get_local_foot_base_state_from_torso_translation(link,
+                                                                                                         translation,
+                                                                                                         yaw_offset)
+                st = str(yaw_offset)
+                vis.add(st, calculated_new_des)
+
+"""

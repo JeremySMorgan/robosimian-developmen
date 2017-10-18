@@ -55,53 +55,72 @@ class RobotUtils(object):
     # Gamepad input
     GAMEPAD_LEAST_SIGNIFICANT_INPUT     = .01
 
-    # Objective Planner
-    OBJECTIVE_PLANNER_UPDATE_DELAY     = .05
-
     # Debugging
-    OBJ_PLANNER_DEBUGGING_ENABLED               = True
+    OBJ_PLANNER_DEBUGGING_ENABLED               = False
     GAMEPAD_DEBUGGING_ENABLED                   = False
     HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED = True
     MOTION_THREAD_DEBUGGING_ENABLED             = True
 
     # Delay Constants
-    CONTROLLER_DT               = .01
-    GAMEPAD_UPDATE_DELAY        = .01
-    SIMULATION_FRAME_DELAY      = .01
+    CONTROLLER_DT                       = .01
+    GAMEPAD_UPDATE_DELAY                = .01
+    OBJECTIVE_PLANNER_UPDATE_DELAY     = .05
 
     # Global IK constants
-    IK_MAX_DEVIATION            = 1
+    IK_MAX_DEVIATION                    = 1
 
     # Robot Configuration Constants
-    LIMB1_START_CONFIG_OFFSET   = math.pi / 4
+    LIMB1_START_CONFIG_OFFSET           = math.pi / 6
+
+    # Movement timing constants
+    RESET_LEG_STEP_TIME                 = 1
+    TURN_TIME                           = 1
+    TORSO_SHIFT_TIME                    = 1
+    STEP_TIME                           = 1
+    TORSO_YAW_ROTATE_TIME               = 1
 
     # Reset Constants
-    RESET_LEG_STEP_TIME         = 2
-    MINIMUM_X_DELTA             = .005
-    MINIMUM_Y_DELTA             = .005
-    MINIMUM_Z_DELTA             = .005
+    MINIMUM_DIST_TO_CAUSE_RESET         = .05
+    MINIMUM_X_DELTA                     = .01
+    MINIMUM_Y_DELTA                     = .01
+    MINIMUM_Z_DELTA                     = .01
 
     # Turn Constants
-    TURN_TIME                   = 2
-    TORSO_YAW_ROTATE_TIME       = 3
-    TORSO_YAW_ROTATE_ANGLE      = 15
+    TORSO_YAW_ROTATE_ANGLE              = 15
 
     # Step Constants
-    TORSO_SHIFT_TIME            = 2
-    STEP_X_DELTA                = .2
-    STEP_Z_MAX_HIEGHT           = .15
-    TORSO_SHIFT_DELTA           = STEP_X_DELTA
-    STEP_TIME                   = 2
+    STEP_X_DELTA                        = .15
+    STEP_Z_MAX_HIEGHT                   = .15
+    TORSO_SHIFT_DELTA                   = STEP_X_DELTA
 
     # Simulation constants
-    SIMULATION_ENABLED          = True
+    SIMULATION_ENABLED                  = True
+    PHYSICS_ENABLED                     = False
+    INCLUDE_TERRAIN                     = False
 
 
     @staticmethod
     def ColorPrinter( caller, message, color):
         # [03/Apr/2017 18:37:10]
         time = datetime.datetime.now()
+
+        if color not in RobotUtils.COLORS:
+            color = RobotUtils.COLORS.get("STANDARD").get("value")
+
         prefix = "["+str(time.day)+"/"+str(time.month)+ "/" + str(time.year) + " " + str(time.hour) + ":" + str(time.minute) + ":" + str(time.second) +  " ] "
         prefix = prefix +  RobotUtils.COLORS["BOLD"]["value"]+ RobotUtils.COLORS["UNDERLINE"]["value"]+ caller+ RobotUtils.COLORS["ENDC"]["value"]+ ":"
         print  prefix, RobotUtils.COLORS[color]["value"] ,message , RobotUtils.COLORS["ENDC"]["value"]
 
+    @staticmethod
+    def get_euclidian_diff(xyz1, xyz2):
+
+        d_x = (xyz1[0] - xyz2[0])**2
+        d_y = (xyz1[1] - xyz2[1])**2
+        d_z = (xyz1[2] - xyz2[2])**2
+
+        return math.sqrt( d_x +d_y  +d_z    )
+
+
+    @staticmethod
+    def always_true_func():
+        return True
