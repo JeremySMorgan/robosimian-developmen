@@ -4,6 +4,7 @@ import time
 import Queue
 from klampt.model import ik
 from klampt import vis
+import time
 
 class HighLevelMotionController(object):
 
@@ -21,6 +22,12 @@ class HighLevelMotionController(object):
         self.MotionController = Controller
         self.motion_queue = Queue.Queue()
         self.motion_thread_currently_running = False
+
+        self.measured_controller_dt = RobotUtils.CONTROLLER_DT
+        self.block_start_time = 0
+        self.control_loop_calls = 0
+        self.first_control_loop = True
+        self.readings_in_block = 20.0
 
     #                                              Initiate Class
     # ------------------------------------------                      ------------------------------------------------
@@ -63,7 +70,7 @@ class HighLevelMotionController(object):
 
         self.robosimian.setConfig(q)
 
-        self.motion_queue.put_nowait(q)
+        self.add_q_to_motion_queue(q)
 
 
 
@@ -80,8 +87,23 @@ class HighLevelMotionController(object):
 
     def control_loop(self):
 
+        self.control_loop_calls += 1
 
-        print "motion queue size: ",self.motion_queue.qsize()
+        if self.first_control_loop:
+            self.first_control_loop = False
+            self.block_start_time = time.time()
+
+
+        if self.control_loop_calls == self.readings_in_block:
+            sum_block_t = ( time.time() - self.block_start_time)
+            #print "sum block t:",sum_block_t
+            self.measured_controller_dt =  sum_block_t/  self.readings_in_block
+            self.control_loop_calls = 0
+            self.first_control_loop = True
+
+
+
+        print "motion queue size: ",self.motion_queue.qsize(), "measured controller dt:",self.measured_controller_dt
         if not self.motion_queue.empty():
 
             calculated_next_config = self.motion_queue.get_nowait()
@@ -92,7 +114,8 @@ class HighLevelMotionController(object):
         self.motion_queue.empty()
 
 
-
+    def add_q_to_motion_queue(self,q):
+        self.motion_queue.put_nowait(q)
 
 
     #                                              Callable Motion APIS
@@ -227,10 +250,7 @@ class HighLevelMotionController(object):
             self.RobotUtils.ColorPrinter((self.__class__.__name__+".forward_walk()"), "Starting forward walk", "STANDARD")
 
         delta_x = self.RobotUtils.TORSO_SHIFT_DELTA
-
-        translation = [delta_x, 0, 0]
-        quarter_translation = [translation[0]/4, 0, 0]
-        half_translation = [translation[0]/2, 0, 0]
+        left_shift = self.RobotUtils.TORSO_LEFT_SHIFT
 
         f_extend_state = self.RobotUtils.LEG_F_EXTEND_STATE
         base_state = self.RobotUtils.BASE_STATE
@@ -242,40 +262,46 @@ class HighLevelMotionController(object):
         f_l = self.RobotUtils.F_L_FOOT
         b_l = self.RobotUtils.B_L_FOOT
 
-        self.reset_to_base_state()
+        if self.RobotUtils.PHYSICS_ENABLED:
+            sleep_t = 5
+        else:
+            sleep_t = 2
 
-        sleep_t = 0
+        three_q_trans_1xleft = [(3.0*delta_x)/4, left_shift, 0 ]
+        three_q_trans_2xleft = [(3.0*delta_x)/4, 2*left_shift, 0 ]
+
+        one_q_trans_1xright = [(delta_x) / 4, -left_shift, 0]
+        one_q_trans_2xright = [(delta_x) / 4, -2 * left_shift, 0]
+
+        three_q_trans_1xright = [(3.0*delta_x)/4, -left_shift, 0 ]
+        three_q_trans_2xright = [(3.0 * delta_x) / 4, -2*left_shift, 0]
+
 
         while 1:
-        #if True:
 
-            if not self.make_torso_shift_from_local_xyz_translation(half_translation, MotionThread):
+            if not self.make_torso_shift_from_local_xyz_translation(three_q_trans_1xleft, MotionThread):
                 break
 
             time.sleep(sleep_t)
             if not self.make_leg_step_by_new_state(b_r, f_extend_state, MotionThread):
-            #if not self.make_leg_step_by_delta_x(b_r, delta_x, MotionThread):
-                    break
-
-            time.sleep(sleep_t)
-            if not self.make_leg_step_by_new_state(f_r, f_extend_state, MotionThread):
-
-                #if not self.make_leg_step_by_delta_x(f_r, delta_x, MotionThread):
                 break
 
             time.sleep(sleep_t)
-            if not self.make_torso_shift_from_local_xyz_translation(half_translation, MotionThread):
+            if not self.make_leg_step_by_new_state(f_r, f_extend_state, MotionThread):
+                break
+
+            time.sleep(sleep_t)
+            if not self.make_torso_shift_from_local_xyz_translation(three_q_trans_2xright, MotionThread):
                 break
 
             time.sleep(sleep_t)
             if not self.make_leg_step_by_new_state(b_l, f_extend_state, MotionThread):
-                #if not self.make_leg_step_by_delta_x(b_l, delta_x, MotionThread):
                 break
 
             time.sleep(sleep_t)
             if not self.make_leg_step_by_new_state(f_l, f_extend_state, MotionThread):
-                #if not self.make_leg_step_by_delta_x(f_l, delta_x, MotionThread):
                 break
+
 
 
         self.clear_motion_queue()
@@ -445,7 +471,7 @@ class HighLevelMotionController(object):
         desired_orientation = self.MotionPlanner.get_desired_foot_rotation(link_name)
 
         # Time calculations
-        delay = self.RobotUtils.CONTROLLER_DT
+        delay = self.measured_controller_dt
         i_max = int( step_time / float(delay))
 
         global_start_xyz = link.getWorldPosition([0, 0, 0])
@@ -481,9 +507,10 @@ class HighLevelMotionController(object):
                     self.RobotUtils.ColorPrinter((self.__class__.__name__+".linear_leg_step_to_local_xyz_in_t()"), "linear_leg_step_to_local_xyz_in_t ik failure", "FAIL")
 
                 else:
-                    self.motion_queue.put(self.robosimian.getConfig())
+                    self.add_q_to_motion_queue(self.robosimian.getConfig())
 
                 time.sleep(delay)
+                delay = self.measured_controller_dt
 
             else:
                 if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
@@ -503,10 +530,8 @@ class HighLevelMotionController(object):
         @return: False if thread was suspended mid step. True otherwise
         """
 
-        robot_states = []
-
         # Time calculations
-        delay = self.RobotUtils.CONTROLLER_DT
+        delay = self.measured_controller_dt
         i_max = int(self.RobotUtils.TORSO_SHIFT_TIME / delay)
 
         global_xyz_start = self.MotionPlanner.get_world_xyz_from_local_xyz([0, 0, 0])
@@ -538,10 +563,10 @@ class HighLevelMotionController(object):
 
                 self.shift_torso_to_global_xyz(global_xyz)
 
-                q = self.robosimian.getConfig()
-                robot_states.append(q)
+                self.add_q_to_motion_queue(self.robosimian.getConfig())
 
                 time.sleep(delay)
+                delay = self.measured_controller_dt
 
             else:
                 if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
@@ -555,7 +580,7 @@ class HighLevelMotionController(object):
     def make_torso_rotation(self, degree, MotionThread):
 
         offset = 1
-        delay = self.RobotUtils.CONTROLLER_DT
+        delay = self.measured_controller_dt
         i_max = int(math.fabs(degree))
 
         if degree < 0:
@@ -566,6 +591,7 @@ class HighLevelMotionController(object):
             if MotionThread.is_alive():
                 self.rotate_torso_from_yaw_offset(offset)
                 time.sleep(delay)
+                delay = self.measured_controller_dt
             else:
                 return False
         return True
@@ -637,7 +663,7 @@ class HighLevelMotionController(object):
             self.RobotUtils.ColorPrinter(self.__class__.__name__, "torso ik failure", "FAIL")
 
         else:
-            self.motion_queue.put(self.robosimian.getConfig())
+            self.add_q_to_motion_queue(self.robosimian.getConfig())
 
 
     def shift_torso_to_global_xyz(self, global_xyz):
@@ -682,7 +708,7 @@ class HighLevelMotionController(object):
                               feasibilityCheck=self.RobotUtils.always_true_func)
 
         if res:
-            self.motion_queue.put(self.robosimian.getConfig())
+            self.add_q_to_motion_queue(self.robosimian.getConfig())
         else:
             if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
                 self.RobotUtils.ColorPrinter(self.__class__.__name__, "torso ik failure", "FAIL")

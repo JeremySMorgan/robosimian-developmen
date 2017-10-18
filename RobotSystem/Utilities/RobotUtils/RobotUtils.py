@@ -59,25 +59,18 @@ class RobotUtils(object):
     OBJ_PLANNER_DEBUGGING_ENABLED               = False
     GAMEPAD_DEBUGGING_ENABLED                   = False
     HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED = True
-    MOTION_THREAD_DEBUGGING_ENABLED             = True
+    MOTION_THREAD_DEBUGGING_ENABLED             = False
 
     # Delay Constants
     CONTROLLER_DT                       = .01
     GAMEPAD_UPDATE_DELAY                = .01
-    OBJECTIVE_PLANNER_UPDATE_DELAY     = .05
+    OBJECTIVE_PLANNER_UPDATE_DELAY      = .05
 
     # Global IK constants
-    IK_MAX_DEVIATION                    = 1
+    IK_MAX_DEVIATION                    = .25
 
     # Robot Configuration Constants
-    LIMB1_START_CONFIG_OFFSET           = math.pi / 6
-
-    # Movement timing constants
-    RESET_LEG_STEP_TIME                 = 1
-    TURN_TIME                           = 1
-    TORSO_SHIFT_TIME                    = 1
-    STEP_TIME                           = 1
-    TORSO_YAW_ROTATE_TIME               = 1
+    LIMB1_START_CONFIG_OFFSET           = math.pi / 3
 
     # Reset Constants
     MINIMUM_DIST_TO_CAUSE_RESET         = .05
@@ -90,13 +83,29 @@ class RobotUtils(object):
 
     # Step Constants
     STEP_X_DELTA                        = .15
-    STEP_Z_MAX_HIEGHT                   = .15
+    STEP_Z_MAX_HIEGHT                   = .05
     TORSO_SHIFT_DELTA                   = STEP_X_DELTA
+    TORSO_LEFT_SHIFT                    = .075
 
     # Simulation constants
     SIMULATION_ENABLED                  = True
-    PHYSICS_ENABLED                     = False
-    INCLUDE_TERRAIN                     = False
+    PHYSICS_ENABLED                     = True
+    INCLUDE_TERRAIN                     = True
+
+    # Movement timing constants
+    if PHYSICS_ENABLED:
+        RESET_LEG_STEP_TIME                 = 3
+        TURN_TIME                           = 5
+        TORSO_SHIFT_TIME                    = 4
+        STEP_TIME                           = 6
+        TORSO_YAW_ROTATE_TIME               = 3
+
+    else:
+        RESET_LEG_STEP_TIME                 = 1
+        TURN_TIME                           = 1
+        TORSO_SHIFT_TIME                    = 1
+        STEP_TIME                           = 1
+        TORSO_YAW_ROTATE_TIME               = 1
 
 
     @staticmethod

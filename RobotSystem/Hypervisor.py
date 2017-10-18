@@ -42,9 +42,6 @@ class Hypervisor():
                 raise RuntimeError("Unable to load plane")
 
 
-
-        coordinates.setWorldModel(world)
-
         self.initialize_visualization(world)
 
         self.robosimian = world.robot(0)
