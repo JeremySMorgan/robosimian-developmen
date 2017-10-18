@@ -20,7 +20,7 @@ class HighLevelMotionController(object):
         self.MotionPlanner = None
         self.MotionController = Controller
         self.motion_queue = Queue.Queue()
-
+        self.motion_thread_currently_running = False
 
     #                                              Initiate Class
     # ------------------------------------------                      ------------------------------------------------
@@ -117,6 +117,14 @@ class HighLevelMotionController(object):
         @return: None
         """
 
+        if self.motion_thread_currently_running:
+            if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
+                status = "Different motion thread is currently running, terminating"
+                self.RobotUtils.ColorPrinter((self.__class__.__name__ + ".make_right_turn()"),status, "FAIL")
+            return
+
+        self.motion_thread_currently_running = True
+
         if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
             self.RobotUtils.ColorPrinter((self.__class__.__name__+".make_right_turn()"), "Starting right turn", "STANDARD")
 
@@ -146,11 +154,22 @@ class HighLevelMotionController(object):
 
         self.clear_motion_queue()
         self.reset_to_base_state()
+        self.motion_thread_currently_running = False
 
 
 
 
     def make_left_turn(self, MotionThread):
+
+
+        if self.motion_thread_currently_running:
+            if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
+                status = "Different motion thread is currently running, terminating"
+                self.RobotUtils.ColorPrinter((self.__class__.__name__ + ".make_left_turn()"),status, "FAIL")
+            return
+
+        self.motion_thread_currently_running = True
+
 
         if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
             self.RobotUtils.ColorPrinter((self.__class__.__name__+".make_left_turn()"), "Starting left turn", "STANDARD")
@@ -181,6 +200,7 @@ class HighLevelMotionController(object):
         self.reset_to_base_state()
 
 
+        self.motion_thread_currently_running = False
 
 
 
@@ -194,6 +214,14 @@ class HighLevelMotionController(object):
         @param MotionThread: MotionThread object holding the thread that this method is run by
         @return: None
         """
+
+        if self.motion_thread_currently_running:
+            if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
+                status = "Different motion thread is currently running, terminating"
+                self.RobotUtils.ColorPrinter((self.__class__.__name__ + ".forward()"), status, "FAIL")
+            return
+
+        self.motion_thread_currently_running = True
 
         if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
             self.RobotUtils.ColorPrinter((self.__class__.__name__+".forward_walk()"), "Starting forward walk", "STANDARD")
@@ -253,12 +281,7 @@ class HighLevelMotionController(object):
         self.clear_motion_queue()
         self.reset_to_base_state()
 
-
-
-
-
-
-
+        self.motion_thread_currently_running = False
 
 
 
@@ -272,6 +295,14 @@ class HighLevelMotionController(object):
         @param MotionThread: MotionThread object holding the thread that this method is run by
         @return: None
         """
+
+        if self.motion_thread_currently_running:
+            if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
+                status = "Different motion thread is currently running, terminating"
+                self.RobotUtils.ColorPrinter((self.__class__.__name__ + ".backward()"), status, "FAIL")
+            return
+
+        self.motion_thread_currently_running = True
 
         if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
             self.RobotUtils.ColorPrinter((self.__class__.__name__+"backward_walk()"), "Starting backward walk", "STANDARD")
@@ -297,6 +328,7 @@ class HighLevelMotionController(object):
 
         self.clear_motion_queue()
         self.reset_to_base_state()
+        self.motion_thread_currently_running = False
 
 
 

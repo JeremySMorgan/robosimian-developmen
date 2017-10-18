@@ -5,7 +5,6 @@ import time
 
 import math
 
-
 from klampt import *
 from klampt.model import coordinates
 
