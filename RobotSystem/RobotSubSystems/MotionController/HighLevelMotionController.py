@@ -40,35 +40,42 @@ class HighLevelMotionController(object):
 
 
     def initialize_motion_planner(self, motion_planner):
+
         self.MotionPlanner = motion_planner
 
-        f_r_base = self.MotionPlanner.get_local_foot_base_state_from_foot_name(self.RobotUtils.F_R_FOOT)
-
-        vis.add("Front Right foot base state", f_r_base)
 
 
     def set_inital_config(self):
 
+        pos_x_shoulder_base = self.RobotUtils.SHOULDER_X
+        pos_y_shoulder_base = self.RobotUtils.SHOULDER_Y
+
+        pos_x_end_aff_delta = self.RobotUtils.BASE_STATE_X_DELTA
+        pos_y_end_aff_delta = self.RobotUtils.BASE_STATE_Y_DELTA
+
+        end_eff_z_pos       = self.RobotUtils.BASE_STATE_Z_DELTA
+
+        f_r_local_base_state = [ pos_x_shoulder_base + pos_x_end_aff_delta, -pos_y_shoulder_base - pos_y_end_aff_delta, end_eff_z_pos ]
+        f_l_local_base_state = [ pos_x_shoulder_base + pos_x_end_aff_delta, pos_y_shoulder_base + pos_y_end_aff_delta, end_eff_z_pos ]
+        b_l_local_base_state = [ -pos_x_shoulder_base - pos_x_end_aff_delta, pos_y_shoulder_base + pos_y_end_aff_delta, end_eff_z_pos ]
+        b_r_local_base_state = [ -pos_x_shoulder_base  - pos_x_end_aff_delta, -pos_y_shoulder_base - pos_y_end_aff_delta, end_eff_z_pos ]
+
+        end_effactors = [ self.RobotUtils.F_R_FOOT,  self.RobotUtils.F_L_FOOT,   self.RobotUtils.B_L_FOOT,   self.RobotUtils.B_R_FOOT ]
+        base_states =   [ f_r_local_base_state,      f_l_local_base_state,       b_l_local_base_state,       b_r_local_base_state     ]
+
+        step_time = self.RobotUtils.INITIALIZATION_STEP_TIME
+
+        for i in range(len(base_states)):
+            local_xyz_des = base_states[i]
+            end_effactor = end_effactors[i]
+
+            vis.add((end_effactor+" base state"), self.MotionPlanner.get_world_xyz_from_local_xyz(local_xyz_des))
+
+            self.linear_leg_step_to_local_xyz_in_t(end_effactor, local_xyz_des, step_time)
+
+
         # Get configuration array
         q = self.robosimian.getConfig()
-
-        # Set joints to
-        for i in range(len(q)):
-            q[i] = 0
-
-        link2_offset_indexes = [8, 16, 24, 32]
-        link4_offset_indexes = [10, 18, 26, 34]
-
-        pos_sign = [1, -1, 1, -1]
-        neg_sign = [-1, 1, -1, 1]
-
-        for i in range(len(link2_offset_indexes)):
-            q[link2_offset_indexes[i]] = pos_sign[i] * self.RobotUtils.LIMB1_START_CONFIG_OFFSET
-
-        for i in range(len(link4_offset_indexes)):
-            q[link4_offset_indexes[i]] = neg_sign[i] * (self.RobotUtils.LIMB1_START_CONFIG_OFFSET + (math.pi / 2.0))
-
-        self.robosimian.setConfig(q)
 
         self.add_q_to_motion_queue(q)
 
@@ -82,7 +89,6 @@ class HighLevelMotionController(object):
     # Contains:
     #           - control_loop
     #           - clear_motion_queue
-
 
 
     def control_loop(self):
@@ -156,13 +162,9 @@ class HighLevelMotionController(object):
         step_time = self.RobotUtils.TURN_TIME
 
         while 1:
-
             for leg in self.RobotUtils.end_affectors:
 
                 local_end_xyz = self.MotionPlanner.get_local_turn_desitination(leg, torso_rotation_angle)
-
-                vis.add((leg+" - local"),local_end_xyz)
-                vis.add((leg+" - global"),self.MotionPlanner.get_world_xyz_from_local_xyz(local_end_xyz))
 
                 if not self.linear_leg_step_to_local_xyz_in_t(leg, local_end_xyz, step_time, MotionThread):
                     cancelled = True
@@ -172,7 +174,6 @@ class HighLevelMotionController(object):
             if cancelled:
                 break
 
-            print "starting right make torso rotation"
             if not self.make_torso_rotation( torso_rotation_angle, MotionThread): break
 
         self.clear_motion_queue()
@@ -193,7 +194,6 @@ class HighLevelMotionController(object):
 
         self.motion_thread_currently_running = True
 
-
         if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
             self.RobotUtils.ColorPrinter((self.__class__.__name__+".make_left_turn()"), "Starting left turn", "STANDARD")
 
@@ -202,13 +202,9 @@ class HighLevelMotionController(object):
         step_time = self.RobotUtils.TURN_TIME
 
         while 1:
-
             for leg in self.RobotUtils.end_affectors:
 
                 local_end_xyz = self.MotionPlanner.get_local_turn_desitination(leg, torso_rotation_angle)
-
-                vis.add((leg+" - local"),local_end_xyz)
-                vis.add((leg+" - global"),self.MotionPlanner.get_world_xyz_from_local_xyz(local_end_xyz))
 
                 if not self.linear_leg_step_to_local_xyz_in_t(leg, local_end_xyz, step_time, MotionThread):
                     cancelled = True
@@ -221,8 +217,6 @@ class HighLevelMotionController(object):
 
         self.clear_motion_queue()
         self.reset_to_base_state()
-
-
         self.motion_thread_currently_running = False
 
 
@@ -249,13 +243,8 @@ class HighLevelMotionController(object):
         if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
             self.RobotUtils.ColorPrinter((self.__class__.__name__+".forward_walk()"), "Starting forward walk", "STANDARD")
 
-        delta_x = self.RobotUtils.TORSO_SHIFT_DELTA
-        left_shift = self.RobotUtils.TORSO_LEFT_SHIFT
-
         f_extend_state = self.RobotUtils.LEG_F_EXTEND_STATE
         base_state = self.RobotUtils.BASE_STATE
-
-        cancelled = False
 
         f_r = self.RobotUtils.F_R_FOOT
         b_r = self.RobotUtils.B_R_FOOT
@@ -265,43 +254,41 @@ class HighLevelMotionController(object):
         if self.RobotUtils.PHYSICS_ENABLED:
             sleep_t = 5
         else:
-            sleep_t = 2
+            sleep_t = .5
 
-        three_q_trans_1xleft = [(3.0*delta_x)/4, left_shift, 0 ]
-        three_q_trans_2xleft = [(3.0*delta_x)/4, 2*left_shift, 0 ]
+        delta_x = self.RobotUtils.TORSO_SHIFT_DELTA
+        left_shift = self.RobotUtils.TORSO_LEFT_SHIFT
 
-        one_q_trans_1xright = [(delta_x) / 4, -left_shift, 0]
-        one_q_trans_2xright = [(delta_x) / 4, -2 * left_shift, 0]
-
-        three_q_trans_1xright = [(3.0*delta_x)/4, -left_shift, 0 ]
-        three_q_trans_2xright = [(3.0 * delta_x) / 4, -2*left_shift, 0]
-
+        l_torso_shift = [ delta_x, left_shift, 0 ]
+        r_torso_shift = [ delta_x, -1*left_shift, 0 ]
 
         while 1:
 
-            if not self.make_torso_shift_from_local_xyz_translation(three_q_trans_1xleft, MotionThread):
+            if not self.make_torso_shift_from_local_xyz_translation(l_torso_shift, MotionThread):
                 break
 
             time.sleep(sleep_t)
-            if not self.make_leg_step_by_new_state(b_r, f_extend_state, MotionThread):
+            if not self.make_leg_step_by_new_state(b_r, base_state, MotionThread):
                 break
 
             time.sleep(sleep_t)
-            if not self.make_leg_step_by_new_state(f_r, f_extend_state, MotionThread):
+            f_r_local_xyz_des = self.MotionPlanner.get_local_foot_base_state_from_torso_translation(f_r, r_torso_shift, 0)
+            if not self.make_leg_step_to_local_xyz(f_r, f_r_local_xyz_des, MotionThread):
                 break
 
             time.sleep(sleep_t)
-            if not self.make_torso_shift_from_local_xyz_translation(three_q_trans_2xright, MotionThread):
+            if not self.make_torso_shift_from_local_xyz_translation(r_torso_shift, MotionThread):
                 break
 
             time.sleep(sleep_t)
-            if not self.make_leg_step_by_new_state(b_l, f_extend_state, MotionThread):
+            if not self.make_leg_step_by_new_state(b_l, base_state, MotionThread):
                 break
 
             time.sleep(sleep_t)
-            if not self.make_leg_step_by_new_state(f_l, f_extend_state, MotionThread):
+            if not self.make_leg_step_by_new_state(f_l, base_state, MotionThread):
                 break
 
+            time.sleep(sleep_t)
 
 
         self.clear_motion_queue()
@@ -376,7 +363,14 @@ class HighLevelMotionController(object):
 
 
 
+    def make_leg_step_to_local_xyz(self, end_affector_name, local_end_xyz, MotionThread):
 
+
+        step_time = self.RobotUtils.STEP_TIME
+
+        result = self.linear_leg_step_to_local_xyz_in_t(end_affector_name, local_end_xyz, step_time, MotionThread)
+
+        return result
 
 
     def make_leg_step_by_new_state(self, end_affector_name, end_leg_state, MotionThread):
@@ -401,11 +395,8 @@ class HighLevelMotionController(object):
                                                                   "but not by make_leg_step_by_new_state()", "FAIL")
             return None
 
-        step_time = self.RobotUtils.STEP_TIME
+        return self.make_leg_step_to_local_xyz(end_affector_name, local_end_xyz, MotionThread)
 
-        result = self.linear_leg_step_to_local_xyz_in_t(end_affector_name, local_end_xyz, step_time, MotionThread)
-
-        return result
 
 
     def reset_to_base_state(self):
@@ -425,7 +416,6 @@ class HighLevelMotionController(object):
 
         t = self.RobotUtils.RESET_LEG_STEP_TIME
 
-
         # reset legs to base state if not positioned correctly
         for end_affector in self.RobotUtils.end_affectors:
 
@@ -436,6 +426,7 @@ class HighLevelMotionController(object):
             euclidian_delta = self.RobotUtils.get_euclidian_diff(link_local_xyz, local_end_xyz)
 
             if euclidian_delta > self.RobotUtils.MINIMUM_DIST_TO_CAUSE_RESET:
+                print "resetting leg:",end_affector
                 self.linear_leg_step_to_local_xyz_in_t(end_affector, local_end_xyz, t)
 
 
@@ -477,18 +468,13 @@ class HighLevelMotionController(object):
         global_start_xyz = link.getWorldPosition([0, 0, 0])
         global_end_xyz = self.MotionPlanner.get_world_xyz_from_local_xyz(local_end_xyz)
 
-        # Check to see that the foot is actually moving. Will throw division by 0 error otherwise
-        x_delta = abs(global_end_xyz[0] - global_start_xyz[0])
-        y_delta = abs(global_end_xyz[1] - global_start_xyz[1])
-        z_delta = abs(global_end_xyz[2] - global_start_xyz[2])
+        vis.add(link_name,global_end_xyz)
 
         ik_max_deviation = self.RobotUtils.IK_MAX_DEVIATION
 
-
         if self.RobotUtils.get_euclidian_diff(global_start_xyz, global_end_xyz) < self.RobotUtils.MINIMUM_DIST_TO_CAUSE_RESET:
-            #self.RobotUtils.ColorPrinter((self.__class__.__name__+".linear_leg_step_to_local_xyz_in_t():"),"Negiligble change- Exiting function", "OKGREEN")
+            self.RobotUtils.ColorPrinter((self.__class__.__name__+".linear_leg_step_to_local_xyz_in_t():"),("Negiligble change for leg:"+link_name+"Exiting function"), "OKGREEN")
             return True
-
 
         for i in range(i_max):
 
@@ -756,63 +742,3 @@ class HighLevelMotionController(object):
 
 
 
-
-
-
-
-
-
-
-
-'''
-def forward_walk(self, MotionThread):
-
-    """
-    @summary: Highest level callable method for making a forward step. This method will run until the motion thread
-                is shutdown at which point it will reset the robot to a stable state
-    @param MotionThread: MotionThread object holding the thread that this method is run by
-    @return: None
-    """
-
-    if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
-        self.RobotUtils.ColorPrinter((self.__class__.__name__+".forward_walk()"), "Starting forward walk", "STANDARD")
-
-    translation = [self.RobotUtils.TORSO_SHIFT_DELTA, 0, 0]
-    quarter_translation = [translation[0]/4, 0, 0]
-
-    f_extend_state = self.RobotUtils.LEG_F_EXTEND_STATE
-
-    cancelled = False
-
-    while 1:
-
-        for leg in self.RobotUtils.end_affectors:
-            if not self.make_leg_step_by_new_state(leg, f_extend_state, MotionThread): cancelled = True; break
-            if not self.make_leg_step_by_new_state(leg, f_extend_state, MotionThread): cancelled = True; break
-            if not self.make_leg_step_by_new_state(leg, f_extend_state, MotionThread): cancelled = True; break
-            if not self.make_leg_step_by_new_state(leg, f_extend_state, MotionThread): cancelled = True; break
-
-        if cancelled:
-            break
-
-        if not self.make_torso_shift_from_local_xyz_translation(translation, MotionThread): break
-
-
-    if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
-        self.RobotUtils.ColorPrinter((self.__class__.__name__+".forward_walk()"), "Ending forward walk", "STANDARD")
-
-    self.clear_motion_queue()
-    self.reset_to_base_state()
-
-
-
-
-
-
-
-
-
-
-
-
-'''

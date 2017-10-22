@@ -59,7 +59,6 @@ class RobotUtils(object):
     OBJ_PLANNER_DEBUGGING_ENABLED               = False
     GAMEPAD_DEBUGGING_ENABLED                   = False
     HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED = True
-    MOTION_THREAD_DEBUGGING_ENABLED             = False
 
     # Delay Constants
     CONTROLLER_DT                       = .01
@@ -67,10 +66,14 @@ class RobotUtils(object):
     OBJECTIVE_PLANNER_UPDATE_DELAY      = .05
 
     # Global IK constants
-    IK_MAX_DEVIATION                    = .25
+    IK_MAX_DEVIATION                    = .715
 
-    # Robot Configuration Constants
-    LIMB1_START_CONFIG_OFFSET           = math.pi / 3
+    # End Affector Base State Position
+    SHOULDER_X                          = .209067915157
+    SHOULDER_Y                          = .206456211
+    BASE_STATE_X_DELTA                  = .35
+    BASE_STATE_Y_DELTA                  = BASE_STATE_X_DELTA
+    BASE_STATE_Z_DELTA                  = -.55
 
     # Reset Constants
     MINIMUM_DIST_TO_CAUSE_RESET         = .05
@@ -89,11 +92,12 @@ class RobotUtils(object):
 
     # Simulation constants
     SIMULATION_ENABLED                  = True
-    PHYSICS_ENABLED                     = True
+    PHYSICS_ENABLED                     = False
     INCLUDE_TERRAIN                     = True
 
     # Movement timing constants
     if PHYSICS_ENABLED:
+        INITIALIZATION_STEP_TIME            = 10
         RESET_LEG_STEP_TIME                 = 3
         TURN_TIME                           = 5
         TORSO_SHIFT_TIME                    = 4
@@ -101,6 +105,7 @@ class RobotUtils(object):
         TORSO_YAW_ROTATE_TIME               = 3
 
     else:
+        INITIALIZATION_STEP_TIME            = 2
         RESET_LEG_STEP_TIME                 = 1
         TURN_TIME                           = 1
         TORSO_SHIFT_TIME                    = 1

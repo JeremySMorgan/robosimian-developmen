@@ -13,6 +13,18 @@ Image of the simulated robot in its start configuration
 <img src="https://github.com/JeremySMorgan/robosimian-gait-development/blob/master/robosimian.png" width="600" height="600" />
 
 
-### Notes
+### Variables
 
-- `measured_controller_dt` *Aproximates the true control loop delay time*. This variable is used in all of the Threaded Moiton in Speficied Time APIS. Note that because of this the TURN/STEP/ect_TIME constants in *RobotUtils* are used as estimates for the total step time. 
+- `measured_controller_dt` Aproximates the true control loop delay time. This variable is used in all of the Threaded Moiton in Speficied Time APIS. Note that because of this the TURN/STEP/ect_TIME constants in *RobotUtils* are used as estimates for the total step time. 
+
+
+### Notes
+      
+- Do not change the robots configuration before calling `initialize_motion_planner`, `initialize_motion_planner`, and `save_base_states` (in order). ex:
+       
+``` python 
+self.HighLevelMotionController.initialize_motion_planner(self.MotionPlanner)
+self.HighLevelMotionController.set_inital_config()
+self.MotionPlanner.save_base_states()
+```
+   

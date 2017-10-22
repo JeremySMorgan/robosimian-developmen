@@ -56,13 +56,14 @@ class Hypervisor():
 
         # Create HighLevelMotionController
         self.HighLevelMotionController = HighLevelMotionController(self.robosimian, RobotUtils, self.controller)
-        self.HighLevelMotionController.set_inital_config()
 
         # Create HighLevelMotionController
         self.MotionPlanner = MotionPlanner(self.robosimian,RobotUtils)
 
-        # Pass the Motion Controller the MotionPlanner
+        # Pass the Motion Controller the MotionPlanner and set the initial conifguration
         self.HighLevelMotionController.initialize_motion_planner(self.MotionPlanner)
+        self.HighLevelMotionController.set_inital_config()
+        self.MotionPlanner.save_base_states()
 
         # User Input
         self.UserInput = UserInput(RobotUtils)
@@ -72,35 +73,52 @@ class Hypervisor():
 
         RobotUtils.ColorPrinter(self.__class__.__name__,"Hypervisor initialization finished","OKBLUE")
 
-        valid_run = True
-
         try:
 
-            if valid_run:
-
-                self.UserInput.start()
-                self.ObjectiveManager.start_objective_management_loop()
-                self.run_visualization()
+            self.UserInput.start()
+            self.ObjectiveManager.start_objective_management_loop()
+            self.run_visualization()
 
             while 1:
+                print "sleeping"
                 time.sleep(1)
 
         except KeyboardInterrupt:
             self.shutdown()
 
 
-
-
-
     def rotate_torso_yaw(self):
         q = self.robosimian.getConfig()
-        q[3] = 3.141592/6
+        q[3] = 3.141592/4
         self.robosimian.setConfig(q)
 
     def shift_x(self):
         q = self.robosimian.getConfig()
-        q[0] -= .75
+        q[0] -= 1.5
         self.robosimian.setConfig(q)
+
+
+
+
+    def find_base_xyz(self):
+
+        q = self.robosimian.getConfig()
+
+        q[8] = -(3.151592 / 2.0)
+        q[9] = (3.141592)
+        q[11] = (3.141592)
+
+        q[16] = (3.151592 / 2.0)
+        q[24] = -(3.151592 / 2.0)
+        q[32] = (3.151592 / 2.0)
+
+        self.robosimian.setConfig(q)
+
+        l1 = self.robosimian.link(15).getLocalPosition([0, 0, 0])
+
+        print(l1)
+
+
 
     def shutdown(self):
 
@@ -141,45 +159,3 @@ class Hypervisor():
             time.sleep(RobotUtils.CONTROLLER_DT)
             if not vis.shown():
                 sys.exit()
-
-
-
-
-
-
-
-
-
-
-"""
-            self.shift_x()
-            self.rotate_torso_yaw()
-
-            for i in range(30):
-                self.HighLevelMotionController.rotate_torso_from_yaw_offset(1)
-                time.sleep(.1)
-
-            for i in range(50):
-                self.HighLevelMotionController.rotate_torso_from_yaw_offset(-1)
-                time.sleep(.1)
-
-"""
-
-
-
-"""
-            self.rotate_torso_yaw()
-
-            link = RobotUtils.F_L_FOOT
-
-            translation = [0, 0, 0]
-
-            for yaw_offset in range(1, 120, 20):
-
-                calculated_new_des = self.MotionPlanner.get_local_foot_base_state_from_torso_translation(link,
-                                                                                                         translation,
-                                                                                                         yaw_offset)
-                st = str(yaw_offset)
-                vis.add(st, calculated_new_des)
-
-"""
