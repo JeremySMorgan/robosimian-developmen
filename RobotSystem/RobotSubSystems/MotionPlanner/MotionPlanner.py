@@ -11,18 +11,19 @@ class MotionPlanner():
         self.robosimian = robot
         self.RobotUtils = RobotUtils
 
-        self.f_r_foot = self.robosimian.link(self.RobotUtils.f_r_active_dofs[len(self.RobotUtils.f_r_active_dofs) - 1])
-        self.f_l_foot = self.robosimian.link(self.RobotUtils.f_l_active_dofs[len(self.RobotUtils.f_l_active_dofs) - 1])
-        self.b_r_foot = self.robosimian.link(self.RobotUtils.b_r_active_dofs[len(self.RobotUtils.b_r_active_dofs) - 1])
-        self.b_l_foot = self.robosimian.link(self.RobotUtils.b_l_active_dofs[len(self.RobotUtils.b_l_active_dofs) - 1])
+        self.f_r_end_affector = self.robosimian.link(self.RobotUtils.f_r_active_dofs[len(self.RobotUtils.f_r_active_dofs) - 1])
+        self.f_l_end_affector = self.robosimian.link(self.RobotUtils.f_l_active_dofs[len(self.RobotUtils.f_l_active_dofs) - 1])
+        self.b_r_end_affector = self.robosimian.link(self.RobotUtils.b_r_active_dofs[len(self.RobotUtils.b_r_active_dofs) - 1])
+        self.b_l_end_affector = self.robosimian.link(self.RobotUtils.b_l_active_dofs[len(self.RobotUtils.b_l_active_dofs) - 1])
 
     # TODO: Figure out why this needs to be worldPosition, not localPosition as would be expected
     def save_base_states(self):
 
-        self.local_f_r_foot_base_state = self.f_r_foot.getWorldPosition([0, 0, 0])
-        self.local_f_l_foot_base_state = self.f_l_foot.getWorldPosition([0, 0, 0])
-        self.local_b_r_foot_base_state = self.b_r_foot.getWorldPosition([0, 0, 0])
-        self.local_b_l_foot_base_state = self.b_l_foot.getWorldPosition([0, 0, 0])
+        self.local_f_r_end_affector_base_state = self.f_r_end_affector.getWorldPosition([0, 0, 0])
+        self.local_f_l_end_affector_base_state = self.f_l_end_affector.getWorldPosition([0, 0, 0])
+        self.local_b_r_end_affector_base_state = self.b_r_end_affector.getWorldPosition([0, 0, 0])
+        self.local_b_l_end_affector_base_state = self.b_l_end_affector.getWorldPosition([0, 0, 0])
+
 
 
     def get_linear_mid_motion_xyz(self, startXYZ, endXYZ, i, i_max):
@@ -63,17 +64,17 @@ class MotionPlanner():
         return res
 
 
-    def get_desired_foot_rotation(self, foot_name):
+    def get_desired_end_affector_rotation(self, end_affector_name):
 
         """
         @summary Returns a rotation matrix for a given
-        @param foot_name:
+        @param end_affector_name:
         @return:
         """
 
         robot_yaw_rad = self.get_current_torso_yaw_rads()
 
-        if foot_name in self.RobotUtils.left_feet:
+        if end_affector_name in self.RobotUtils.left_feet:
             r = [0, 0, -1, 0, -1, 0, -1, 0, 0]
 
         else:
@@ -125,11 +126,11 @@ class MotionPlanner():
         return translated_and_rotated_point
 
 
-    def get_local_foot_base_state_from_torso_translation(self, leg, translation, yaw_rotation_offset_degrees):
+    def get_local_end_affector_base_state_from_torso_translation(self, leg, translation, yaw_rotation_offset_degrees):
 
         yaw_rot_offset = math.radians(yaw_rotation_offset_degrees)
 
-        local_base_state_xyz = self.get_local_foot_base_state_from_foot_name(leg)
+        local_base_state_xyz = self.get_local_end_affector_base_state_from_end_affector_name(leg)
 
         aa = ([0,0,1], yaw_rot_offset)
         R = so3.from_axis_angle(aa)
@@ -139,22 +140,22 @@ class MotionPlanner():
         return [ new_local_base_rotated_unshifted[0] + translation[0], new_local_base_rotated_unshifted[1] + translation[1], new_local_base_rotated_unshifted[2] + translation[2]]
 
 
-    def get_local_turn_desitination(self, foot_name, offset_deg):
+    def get_local_turn_desitination(self, end_affector_name, offset_deg):
 
-        return self.get_local_foot_base_state_from_torso_translation( foot_name, [0,0,0], offset_deg)
+        return self.get_local_end_affector_base_state_from_torso_translation( end_affector_name, [0,0,0], offset_deg)
 
 
 
-    def get_extended_foot_local_xyz(self, foot_name, direction):
+    def get_extended_end_affector_local_xyz(self, end_affector_name, direction):
 
-        back_leg = foot_name in [self.RobotUtils.B_L_FOOT,self.RobotUtils.B_R_FOOT ]
+        back_leg = end_affector_name in [self.RobotUtils.B_L_FOOT,self.RobotUtils.B_R_FOOT ]
 
         a = 2
 
-        base_foot_state = self.get_local_foot_base_state_from_foot_name(foot_name)
+        base_end_affector_state = self.get_local_end_affector_base_state_from_end_affector_name(end_affector_name)
 
-        # Make a copy of the foot state
-        xyz = [base_foot_state[0], base_foot_state[1], base_foot_state[2]]
+        # Make a copy of the end_affector state
+        xyz = [base_end_affector_state[0], base_end_affector_state[1], base_end_affector_state[2]]
 
         # Add x offset (dependent on direction)
         if direction == self.RobotUtils.FORWARD:
@@ -171,47 +172,47 @@ class MotionPlanner():
         return xyz
 
 
-    def get_local_foot_base_state_from_foot_name(self, foot_name):
+    def get_local_end_affector_base_state_from_end_affector_name(self, end_affector_name):
         
-        if not foot_name in self.RobotUtils.end_affectors:
-            self.RobotUtils.ColorPrinter(self.__class__.__name__,"Error: foot name unrecognized","FAIL")
+        if not end_affector_name in self.RobotUtils.end_affectors:
+            self.RobotUtils.ColorPrinter(self.__class__.__name__,"Error: end_affector name unrecognized","FAIL")
             return None
 
-        if foot_name == self.RobotUtils.B_L_FOOT:
-            base_foot_state = self.local_b_l_foot_base_state
+        if end_affector_name == self.RobotUtils.B_L_FOOT:
+            base_end_affector_state = self.local_b_l_end_affector_base_state
 
-        elif (foot_name == self.RobotUtils.B_R_FOOT):
-            base_foot_state = self.local_b_r_foot_base_state
+        elif (end_affector_name == self.RobotUtils.B_R_FOOT):
+            base_end_affector_state = self.local_b_r_end_affector_base_state
 
-        elif foot_name == self.RobotUtils.F_L_FOOT:
-            base_foot_state = self.local_f_l_foot_base_state
+        elif end_affector_name == self.RobotUtils.F_L_FOOT:
+            base_end_affector_state = self.local_f_l_end_affector_base_state
 
         else:
-            base_foot_state = self.local_f_r_foot_base_state
+            base_end_affector_state = self.local_f_r_end_affector_base_state
 
-        return base_foot_state
+        return base_end_affector_state
 
 
 
-    def get_foot_from_foot_name(self,foot_name):
+    def get_end_affector_from_end_affector_name(self,end_affector_name):
 
-        if not foot_name in self.RobotUtils.end_affectors:
-            print_str = "Error: "+foot_name+" unrecognized"
+        if not end_affector_name in self.RobotUtils.end_affectors:
+            print_str = "Error: "+end_affector_name+" unrecognized"
             self.RobotUtils.ColorPrinter(self.__class__.__name__,print_str,"FAIL")
             return None
 
-        if foot_name == self.RobotUtils.B_L_FOOT:
-            foot = self.b_l_foot
+        if end_affector_name == self.RobotUtils.B_L_FOOT:
+            end_affector = self.b_l_end_affector
 
-        elif (foot_name == self.RobotUtils.B_R_FOOT):
-            foot = self.b_r_foot
+        elif (end_affector_name == self.RobotUtils.B_R_FOOT):
+            end_affector = self.b_r_end_affector
 
-        elif foot_name == self.RobotUtils.F_L_FOOT:
-            foot = self.f_l_foot
+        elif end_affector_name == self.RobotUtils.F_L_FOOT:
+            end_affector = self.f_l_end_affector
 
         else:
-            foot = self.f_r_foot
+            end_affector = self.f_r_end_affector
 
-        return foot
+        return end_affector
 
 

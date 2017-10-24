@@ -12,10 +12,10 @@ class HighLevelMotionController(object):
 
         self.robosimian = robot
 
-        self.f_r_foot = self.robosimian.link(RobotUtils.f_r_active_dofs[len(RobotUtils.f_r_active_dofs) - 1])
-        self.f_l_foot = self.robosimian.link(RobotUtils.f_l_active_dofs[len(RobotUtils.f_l_active_dofs) - 1])
-        self.b_r_foot = self.robosimian.link(RobotUtils.b_r_active_dofs[len(RobotUtils.b_r_active_dofs) - 1])
-        self.b_l_foot = self.robosimian.link(RobotUtils.b_l_active_dofs[len(RobotUtils.b_l_active_dofs) - 1])
+        self.f_r_end_affector = self.robosimian.link(RobotUtils.f_r_active_dofs[len(RobotUtils.f_r_active_dofs) - 1])
+        self.f_l_end_affector = self.robosimian.link(RobotUtils.f_l_active_dofs[len(RobotUtils.f_l_active_dofs) - 1])
+        self.b_r_end_affector = self.robosimian.link(RobotUtils.b_r_active_dofs[len(RobotUtils.b_r_active_dofs) - 1])
+        self.b_l_end_affector = self.robosimian.link(RobotUtils.b_l_active_dofs[len(RobotUtils.b_l_active_dofs) - 1])
 
         self.RobotUtils = RobotUtils
         self.MotionPlanner = None
@@ -27,7 +27,7 @@ class HighLevelMotionController(object):
         self.block_start_time = 0
         self.control_loop_calls = 0
         self.first_control_loop = True
-        self.readings_in_block = 20.0
+        self.readings_in_block = 5.0
 
     #                                              Initiate Class
     # ------------------------------------------                      ------------------------------------------------
@@ -42,8 +42,6 @@ class HighLevelMotionController(object):
     def initialize_motion_planner(self, motion_planner):
 
         self.MotionPlanner = motion_planner
-
-
 
     def set_inital_config(self):
 
@@ -68,16 +66,8 @@ class HighLevelMotionController(object):
         for i in range(len(base_states)):
             local_xyz_des = base_states[i]
             end_effactor = end_effactors[i]
-
-            vis.add((end_effactor+" base state"), self.MotionPlanner.get_world_xyz_from_local_xyz(local_xyz_des))
-
             self.linear_leg_step_to_local_xyz_in_t(end_effactor, local_xyz_des, step_time)
 
-
-        # Get configuration array
-        q = self.robosimian.getConfig()
-
-        self.add_q_to_motion_queue(q)
 
 
 
@@ -99,17 +89,14 @@ class HighLevelMotionController(object):
             self.first_control_loop = False
             self.block_start_time = time.time()
 
-
         if self.control_loop_calls == self.readings_in_block:
             sum_block_t = ( time.time() - self.block_start_time)
-            #print "sum block t:",sum_block_t
             self.measured_controller_dt =  sum_block_t/  self.readings_in_block
             self.control_loop_calls = 0
             self.first_control_loop = True
 
-
-
-        print "motion queue size: ",self.motion_queue.qsize(), "measured controller dt:",self.measured_controller_dt
+        #print_str = "motion queue size: "+str(self.motion_queue.qsize())+ "measured controller dt:"+str(self.measured_controller_dt)
+        #print(print_str)
         if not self.motion_queue.empty():
 
             calculated_next_config = self.motion_queue.get_nowait()
@@ -221,8 +208,6 @@ class HighLevelMotionController(object):
 
 
 
-
-
     def forward_walk(self, MotionThread):
 
         """
@@ -272,7 +257,7 @@ class HighLevelMotionController(object):
                 break
 
             time.sleep(sleep_t)
-            f_r_local_xyz_des = self.MotionPlanner.get_local_foot_base_state_from_torso_translation(f_r, r_torso_shift, 0)
+            f_r_local_xyz_des = self.MotionPlanner.get_local_end_affector_base_state_from_torso_translation(f_r, r_torso_shift, 0)
             if not self.make_leg_step_to_local_xyz(f_r, f_r_local_xyz_des, MotionThread):
                 break
 
@@ -345,11 +330,9 @@ class HighLevelMotionController(object):
 
 
 
-
-
     def make_leg_step_by_delta_x(self, end_affector_name, delta_x, MotionThread):
 
-        link =  self.MotionPlanner.get_foot_from_foot_name(end_affector_name)
+        link =  self.MotionPlanner.get_end_affector_from_end_affector_name(end_affector_name)
 
         local_xyz = link.getLocalPosition([0,0,0])
 
@@ -381,14 +364,14 @@ class HighLevelMotionController(object):
 
         # Determine appropriate end local coordinates
         if end_leg_state == self.RobotUtils.LEG_F_EXTEND_STATE:
-            local_end_xyz = self.MotionPlanner.get_extended_foot_local_xyz(end_affector_name, self.RobotUtils.FORWARD)
+            local_end_xyz = self.MotionPlanner.get_extended_end_affector_local_xyz(end_affector_name, self.RobotUtils.FORWARD)
 
         elif end_leg_state == self.RobotUtils.LEG_B_EXTEND_STATE:
-            local_end_xyz = self.MotionPlanner.get_extended_foot_local_xyz(end_affector_name,
+            local_end_xyz = self.MotionPlanner.get_extended_end_affector_local_xyz(end_affector_name,
                                                                            self.RobotUtils.BACKWARD)
 
         elif end_leg_state == self.RobotUtils.LEG_BASE_STATE:
-            local_end_xyz = self.MotionPlanner.get_local_foot_base_state_from_foot_name(end_affector_name)
+            local_end_xyz = self.MotionPlanner.get_local_end_affector_base_state_from_end_affector_name(end_affector_name)
 
         else:
             self.RobotUtils.ColorPrinter((self.__class__.__name__+"make_leg_step_by_new_state()"), "Error: end leg state is recognized by RobotUtils,"
@@ -419,14 +402,13 @@ class HighLevelMotionController(object):
         # reset legs to base state if not positioned correctly
         for end_affector in self.RobotUtils.end_affectors:
 
-            link = self.MotionPlanner.get_foot_from_foot_name(end_affector)
+            link = self.MotionPlanner.get_end_affector_from_end_affector_name(end_affector)
             link_local_xyz = link.getLocalPosition([0,0,0])
-            local_end_xyz = self.MotionPlanner.get_local_foot_base_state_from_foot_name(end_affector)
+            local_end_xyz = self.MotionPlanner.get_local_end_affector_base_state_from_end_affector_name(end_affector)
 
             euclidian_delta = self.RobotUtils.get_euclidian_diff(link_local_xyz, local_end_xyz)
 
             if euclidian_delta > self.RobotUtils.MINIMUM_DIST_TO_CAUSE_RESET:
-                print "resetting leg:",end_affector
                 self.linear_leg_step_to_local_xyz_in_t(end_affector, local_end_xyz, t)
 
 
@@ -445,7 +427,7 @@ class HighLevelMotionController(object):
     #           - make_torso_shift_from_local_xyz_translation
 
 
-    def linear_leg_step_to_local_xyz_in_t(self, link_name, local_end_xyz, step_time, MotionThread=None):
+    def linear_leg_step_to_local_xyz_in_t(self, link_name, local_end_xyz, step_time, MotionThread=None, append_to_m_queue=True):
 
         """
         @param link_name: link name to move
@@ -455,11 +437,11 @@ class HighLevelMotionController(object):
         @return: False if thread was suspended mid step. True otherwise
         """
 
-        link = self.get_foot_from_foot_name(link_name)
+        link = self.get_end_affector_from_end_affector_name(link_name)
 
         # Retrieve appropriate variables
-        active_dofs = self.get_active_dofs_from_foot_name(link_name)
-        desired_orientation = self.MotionPlanner.get_desired_foot_rotation(link_name)
+        active_dofs = self.get_active_dofs_from_end_affector_name(link_name)
+        desired_orientation = self.MotionPlanner.get_desired_end_affector_rotation(link_name)
 
         # Time calculations
         delay = self.measured_controller_dt
@@ -475,6 +457,8 @@ class HighLevelMotionController(object):
         if self.RobotUtils.get_euclidian_diff(global_start_xyz, global_end_xyz) < self.RobotUtils.MINIMUM_DIST_TO_CAUSE_RESET:
             self.RobotUtils.ColorPrinter((self.__class__.__name__+".linear_leg_step_to_local_xyz_in_t():"),("Negiligble change for leg:"+link_name+"Exiting function"), "OKGREEN")
             return True
+
+        t_start = time.time()
 
         for i in range(i_max):
 
@@ -493,7 +477,8 @@ class HighLevelMotionController(object):
                     self.RobotUtils.ColorPrinter((self.__class__.__name__+".linear_leg_step_to_local_xyz_in_t()"), "linear_leg_step_to_local_xyz_in_t ik failure", "FAIL")
 
                 else:
-                    self.add_q_to_motion_queue(self.robosimian.getConfig())
+                    if append_to_m_queue:
+                        self.add_q_to_motion_queue(self.robosimian.getConfig())
 
                 time.sleep(delay)
                 delay = self.measured_controller_dt
@@ -504,6 +489,9 @@ class HighLevelMotionController(object):
                     self.RobotUtils.ColorPrinter(self.__class__.__name__, status, "FAIL")
                 return False
 
+        t_end =  time.time()
+        t_total = t_end - t_start
+        print( ("Step took: "+str(t_total)+"seconds") )
         return True
 
 
@@ -586,7 +574,7 @@ class HighLevelMotionController(object):
     #                                      Non-Threaded Low Level IK Solver APIS
     # ----------------------------------                                         ------------------------------------
     #
-    # Desc: These functions will calculate a new robot state given a speficied change (torso rotation, foot movement, ect)
+    # Desc: These functions will calculate a new robot state given a speficied change (torso rotation, end_affector movement, ect)
     #       Will return new robot configuration to the caller. Functions do not deal with threading
     #
     # Contains:
@@ -610,10 +598,10 @@ class HighLevelMotionController(object):
 
         torso = self.robosimian.link(self.RobotUtils.TORSO_LINK_INDEX)
 
-        f_l = self.f_l_foot
-        f_r = self.f_r_foot
-        b_l = self.b_l_foot
-        b_r = self.b_r_foot
+        f_l = self.f_l_end_affector
+        f_r = self.f_r_end_affector
+        b_l = self.b_l_end_affector
+        b_r = self.b_r_end_affector
 
         # World Leg Positions
         f_l_global = f_l.getWorldPosition([0, 0, 0])
@@ -622,10 +610,10 @@ class HighLevelMotionController(object):
         b_r_global = b_r.getWorldPosition([0, 0, 0])
 
         # Desired Leg orientation
-        f_l_desired_orientation = self.MotionPlanner.get_desired_foot_rotation(self.RobotUtils.F_L_FOOT)
-        f_r_desired_orientation = self.MotionPlanner.get_desired_foot_rotation(self.RobotUtils.F_R_FOOT)
-        b_l_desired_orientation = self.MotionPlanner.get_desired_foot_rotation(self.RobotUtils.B_L_FOOT)
-        b_r_desired_orientation = self.MotionPlanner.get_desired_foot_rotation(self.RobotUtils.B_R_FOOT)
+        f_l_desired_orientation = self.MotionPlanner.get_desired_end_affector_rotation(self.RobotUtils.F_L_FOOT)
+        f_r_desired_orientation = self.MotionPlanner.get_desired_end_affector_rotation(self.RobotUtils.F_R_FOOT)
+        b_l_desired_orientation = self.MotionPlanner.get_desired_end_affector_rotation(self.RobotUtils.B_L_FOOT)
+        b_r_desired_orientation = self.MotionPlanner.get_desired_end_affector_rotation(self.RobotUtils.B_R_FOOT)
 
         # ik obkectives
         f_l_r_const = ik.objective(f_l, R=f_l_desired_orientation, t=f_l_global)
@@ -663,10 +651,10 @@ class HighLevelMotionController(object):
 
         torso = self.robosimian.link(self.RobotUtils.TORSO_LINK_INDEX)
 
-        f_l = self.f_l_foot
-        f_r = self.f_r_foot
-        b_l = self.b_l_foot
-        b_r = self.b_r_foot
+        f_l = self.f_l_end_affector
+        f_r = self.f_r_end_affector
+        b_l = self.b_l_end_affector
+        b_r = self.b_r_end_affector
 
         # World Leg Positions
         f_l_global = f_l.getWorldPosition([0, 0, 0])
@@ -675,8 +663,8 @@ class HighLevelMotionController(object):
         b_r_global = b_r.getWorldPosition([0, 0, 0])
 
         # Desired Leg orientation
-        left_leg_desired_orientation = self.MotionPlanner.get_desired_foot_rotation(self.RobotUtils.F_L_FOOT)
-        right_leg_desired_orientation = self.MotionPlanner.get_desired_foot_rotation(self.RobotUtils.F_R_FOOT)
+        left_leg_desired_orientation = self.MotionPlanner.get_desired_end_affector_rotation(self.RobotUtils.F_L_FOOT)
+        right_leg_desired_orientation = self.MotionPlanner.get_desired_end_affector_rotation(self.RobotUtils.F_R_FOOT)
 
         # ik obkectives
         f_l_r_const = ik.objective(f_l, R=left_leg_desired_orientation, t=f_l_global)
@@ -715,30 +703,30 @@ class HighLevelMotionController(object):
     #           - linear_leg_step_to_local_xyz_in_t
     #           - make_torso_shift_from_local_xyz_translation
 
-    # Helper function to return the leg joints of a given foot.
-    def get_active_dofs_from_foot_name(self, foot_name):
+    # Helper function to return the leg joints of a given end_affector.
+    def get_active_dofs_from_end_affector_name(self, end_affector_name):
 
-        if not foot_name in self.RobotUtils.end_affectors:
+        if not end_affector_name in self.RobotUtils.end_affectors:
             self.RobotUtils.ColorPrinter(self.__class__.__name__,
-                                         "get_active_dofs_from_foot_name: Error: foot name unrecognized", "FAIL")
+                                         "get_active_dofs_from_end_affector_name: Error: end_affector name unrecognized", "FAIL")
             return None
 
-        if foot_name == self.RobotUtils.B_L_FOOT:
+        if end_affector_name == self.RobotUtils.B_L_FOOT:
             return self.RobotUtils.b_l_active_dofs
 
-        elif (foot_name == self.RobotUtils.B_R_FOOT):
+        elif (end_affector_name == self.RobotUtils.B_R_FOOT):
             return self.RobotUtils.b_r_active_dofs
 
-        elif foot_name == self.RobotUtils.F_L_FOOT:
+        elif end_affector_name == self.RobotUtils.F_L_FOOT:
             return self.RobotUtils.f_l_active_dofs
 
         else:
             return self.RobotUtils.f_r_active_dofs
 
 
-    def get_foot_from_foot_name(self, foot_name):
+    def get_end_affector_from_end_affector_name(self, end_affector_name):
 
-        return self.MotionPlanner.get_foot_from_foot_name(foot_name)
+        return self.MotionPlanner.get_end_affector_from_end_affector_name(end_affector_name)
 
 
 

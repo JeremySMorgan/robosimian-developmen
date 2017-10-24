@@ -12,7 +12,9 @@ from RobotSubSystems.MotionController.HighLevelMotionController import HighLevel
 from RobotSubSystems.MotionPlanner.MotionPlanner import MotionPlanner
 from RobotSubSystems.ObjectiveManager.ObjectiveManager import ObjectiveManager
 from RobotSubSystems.UserInput.UserInput import UserInput
+from RobotSubSystems.StabilityManager.StabilityManager import StabilityManager
 from Utilities.RobotUtils.RobotUtils import RobotUtils
+
 
 if RobotUtils.SIMULATION_ENABLED:
     from klampt import vis
@@ -27,6 +29,7 @@ class Hypervisor():
         self.world = None
         self.MotionController = None
         self.MotionPlanner = None
+
 
     def start(self):
 
@@ -43,16 +46,15 @@ class Hypervisor():
 
 
         self.initialize_visualization(world)
-
-        self.robosimian = world.robot(0)
-
-        # save the simulation
+        self.controller_world = world.copy()
+        self.robosimian = self.controller_world.robot(0)
         self.sim =  Simulator(world)
-        self.sim.simulate(RobotUtils.CONTROLLER_DT)
 
         # Create robot controller
-        self.controller = self.sim.controller(self.robosimian)
+        self.controller = self.sim.controller(0)
         self.controller.setRate(RobotUtils.CONTROLLER_DT)
+
+        self.StabilityManager = StabilityManager(self.robosimian, self.sim, RobotUtils)
 
         # Create HighLevelMotionController
         self.HighLevelMotionController = HighLevelMotionController(self.robosimian, RobotUtils, self.controller)
@@ -79,45 +81,8 @@ class Hypervisor():
             self.ObjectiveManager.start_objective_management_loop()
             self.run_visualization()
 
-            while 1:
-                print "sleeping"
-                time.sleep(1)
-
         except KeyboardInterrupt:
             self.shutdown()
-
-
-    def rotate_torso_yaw(self):
-        q = self.robosimian.getConfig()
-        q[3] = 3.141592/4
-        self.robosimian.setConfig(q)
-
-    def shift_x(self):
-        q = self.robosimian.getConfig()
-        q[0] -= 1.5
-        self.robosimian.setConfig(q)
-
-
-
-
-    def find_base_xyz(self):
-
-        q = self.robosimian.getConfig()
-
-        q[8] = -(3.151592 / 2.0)
-        q[9] = (3.141592)
-        q[11] = (3.141592)
-
-        q[16] = (3.151592 / 2.0)
-        q[24] = -(3.151592 / 2.0)
-        q[32] = (3.151592 / 2.0)
-
-        self.robosimian.setConfig(q)
-
-        l1 = self.robosimian.link(15).getLocalPosition([0, 0, 0])
-
-        print(l1)
-
 
 
     def shutdown(self):
@@ -144,18 +109,21 @@ class Hypervisor():
 
         while RobotUtils.SIMULATION_ENABLED:
 
+
             # Update model
             vis.lock()
 
             if RobotUtils.PHYSICS_ENABLED:
                 self.HighLevelMotionController.control_loop()
 
-            vis.unlock()
-
-            if RobotUtils.PHYSICS_ENABLED:
                 self.sim.updateWorld()
                 self.sim.simulate(RobotUtils.CONTROLLER_DT)
+                self.StabilityManager.check_status()
+
+            vis.unlock()
 
             time.sleep(RobotUtils.CONTROLLER_DT)
             if not vis.shown():
                 sys.exit()
+
+

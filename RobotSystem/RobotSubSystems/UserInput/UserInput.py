@@ -110,22 +110,20 @@ class UserInput(object):
                     # Base state desired
                     else:
                         self.desired_robot_state = self.RobotUtils.BASE_STATE
-
-
         else:
 
             if pygame.joystick.get_count() == 1:
                 self.gamepad = pygame.joystick.Joystick(0)
                 self.gamepad.init()
 
-                if self.RobotUtils.GAMEPAD_DEBUGGING_ENABLED:
+                if self.RobotUtils.USER_INPUT_DEBUGGING_ENABLED:
                     self.RobotUtils.ColorPrinter(self.__class__.__name__, "Gamepad connected", "OKGREEN")
 
             else:
 
                 self.set_desired_state_from_keyboard()
 
-                if self.RobotUtils.GAMEPAD_DEBUGGING_ENABLED:
+                if self.RobotUtils.USER_INPUT_DEBUGGING_ENABLED:
                     if not self.gampad_disconnected_status_printed:
                         self.RobotUtils.ColorPrinter(self.__class__.__name__, "Gamepad disconnected", "FAIL")
                         self.gampad_disconnected_status_printed = True
@@ -133,8 +131,6 @@ class UserInput(object):
 
 
     def set_desired_state_from_keyboard(self):
-
-        #print "in setset_desired_state_from_keyboard"
 
         events = pygame.event.get()
 
@@ -157,8 +153,6 @@ class UserInput(object):
                 if event.key == pygame.K_DOWN:
                     desired_states.append(self.RobotUtils.BACKWARD)
 
-        print len(desired_states)
-
         # if the current state is in the list of pressed key states, give preference to this state, i.e. continue
         if self.desired_robot_state in desired_states:
             pass
@@ -172,7 +166,7 @@ class UserInput(object):
             else:
                 self.desired_robot_state = self.RobotUtils.BASE_STATE
 
-        if self.RobotUtils.GAMEPAD_DEBUGGING_ENABLED:
+        if self.RobotUtils.USER_INPUT_DEBUGGING_ENABLED:
             if not self.gampad_disconnected_status_printed:
                 self.RobotUtils.ColorPrinter(self.__class__.__name__, "Gamepad disconnected", "FAIL")
                 self.gampad_disconnected_status_printed = True
@@ -181,7 +175,7 @@ class UserInput(object):
 
     def print_debug(self):
 
-        if self.RobotUtils.GAMEPAD_DEBUGGING_ENABLED:
+        if self.RobotUtils.USER_INPUT_DEBUGGING_ENABLED:
 
             if not self.desired_robot_state == self.saved_robot_state_desired:
 

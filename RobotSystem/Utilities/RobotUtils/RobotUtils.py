@@ -1,3 +1,4 @@
+from __future__ import print_function
 import math
 import datetime
 
@@ -48,7 +49,6 @@ class RobotUtils(object):
     end_affectors = [ F_R_FOOT, F_L_FOOT, B_R_FOOT, B_L_FOOT]
     leg_states = [LEG_B_EXTEND_STATE,LEG_BASE_STATE,LEG_F_EXTEND_STATE]
 
-
     # App wide multithreading constants
     KEEP_THREAD_ALIVE                   = "thread_is_alive"
 
@@ -56,9 +56,9 @@ class RobotUtils(object):
     GAMEPAD_LEAST_SIGNIFICANT_INPUT     = .01
 
     # Debugging
-    OBJ_PLANNER_DEBUGGING_ENABLED               = False
-    GAMEPAD_DEBUGGING_ENABLED                   = False
-    HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED = True
+    OBJ_PLANNER_DEBUGGING_ENABLED                = False
+    USER_INPUT_DEBUGGING_ENABLED                 = False
+    HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED  = True
 
     # Delay Constants
     CONTROLLER_DT                       = .01
@@ -71,7 +71,7 @@ class RobotUtils(object):
     # End Affector Base State Position
     SHOULDER_X                          = .209067915157
     SHOULDER_Y                          = .206456211
-    BASE_STATE_X_DELTA                  = .35
+    BASE_STATE_X_DELTA                  = .30
     BASE_STATE_Y_DELTA                  = BASE_STATE_X_DELTA
     BASE_STATE_Z_DELTA                  = -.55
 
@@ -88,29 +88,29 @@ class RobotUtils(object):
     STEP_X_DELTA                        = .15
     STEP_Z_MAX_HIEGHT                   = .05
     TORSO_SHIFT_DELTA                   = STEP_X_DELTA
-    TORSO_LEFT_SHIFT                    = .075
+    TORSO_LEFT_SHIFT                    = BASE_STATE_X_DELTA / 2.5
 
     # Simulation constants
     SIMULATION_ENABLED                  = True
-    PHYSICS_ENABLED                     = False
+    PHYSICS_ENABLED                     = True
     INCLUDE_TERRAIN                     = True
 
     # Movement timing constants
     if PHYSICS_ENABLED:
-        INITIALIZATION_STEP_TIME            = 10
+        INITIALIZATION_STEP_TIME            = 1
         RESET_LEG_STEP_TIME                 = 3
         TURN_TIME                           = 5
-        TORSO_SHIFT_TIME                    = 4
-        STEP_TIME                           = 6
-        TORSO_YAW_ROTATE_TIME               = 3
+        TORSO_SHIFT_TIME                    = 20
+        STEP_TIME                           = 10
+        TORSO_YAW_ROTATE_TIME               = 10
 
     else:
-        INITIALIZATION_STEP_TIME            = 2
-        RESET_LEG_STEP_TIME                 = 1
-        TURN_TIME                           = 1
-        TORSO_SHIFT_TIME                    = 1
-        STEP_TIME                           = 1
-        TORSO_YAW_ROTATE_TIME               = 1
+        INITIALIZATION_STEP_TIME            = .5
+        RESET_LEG_STEP_TIME                 = 3
+        TURN_TIME                           = 3
+        TORSO_SHIFT_TIME                    = 3
+        STEP_TIME                           = 3
+        TORSO_YAW_ROTATE_TIME               = 3
 
 
     @staticmethod
@@ -123,7 +123,9 @@ class RobotUtils(object):
 
         prefix = "["+str(time.day)+"/"+str(time.month)+ "/" + str(time.year) + " " + str(time.hour) + ":" + str(time.minute) + ":" + str(time.second) +  " ] "
         prefix = prefix +  RobotUtils.COLORS["BOLD"]["value"]+ RobotUtils.COLORS["UNDERLINE"]["value"]+ caller+ RobotUtils.COLORS["ENDC"]["value"]+ ":"
-        print  prefix, RobotUtils.COLORS[color]["value"] ,message , RobotUtils.COLORS["ENDC"]["value"]
+        print_Str = prefix + " "+RobotUtils.COLORS[color]["value"] + " "+message + " "+RobotUtils.COLORS["ENDC"]["value"]
+        print(print_Str)
+
 
     @staticmethod
     def get_euclidian_diff(xyz1, xyz2):
