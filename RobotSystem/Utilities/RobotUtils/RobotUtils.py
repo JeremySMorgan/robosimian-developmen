@@ -92,17 +92,17 @@ class RobotUtils(object):
 
     # Simulation constants
     SIMULATION_ENABLED                  = True
-    PHYSICS_ENABLED                     = True
+    PHYSICS_ENABLED                     = False
     INCLUDE_TERRAIN                     = True
 
     # Movement timing constants
     if PHYSICS_ENABLED:
-        INITIALIZATION_STEP_TIME            = 1
-        RESET_LEG_STEP_TIME                 = 3
+        INITIALIZATION_STEP_TIME            = 2
+        RESET_LEG_STEP_TIME                 = 5
         TURN_TIME                           = 5
-        TORSO_SHIFT_TIME                    = 20
-        STEP_TIME                           = 10
-        TORSO_YAW_ROTATE_TIME               = 10
+        TORSO_SHIFT_TIME                    = 7
+        STEP_TIME                           = 6
+        TORSO_YAW_ROTATE_TIME               = 5
 
     else:
         INITIALIZATION_STEP_TIME            = .5
@@ -140,3 +140,9 @@ class RobotUtils(object):
     @staticmethod
     def always_true_func():
         return True
+
+    @staticmethod
+    def pp_double(dbl):
+        s = "%.3f" % dbl
+        return s
+

@@ -29,6 +29,8 @@ class HighLevelMotionController(object):
         self.first_control_loop = True
         self.readings_in_block = 5.0
 
+        self.initialization_complete = False
+
     #                                              Initiate Class
     # ------------------------------------------                      ------------------------------------------------
     #
@@ -44,6 +46,12 @@ class HighLevelMotionController(object):
         self.MotionPlanner = motion_planner
 
     def set_inital_config(self):
+
+
+        if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
+            status = "starting initilization "
+            self.RobotUtils.ColorPrinter((self.__class__.__name__+"set_inital_config()"),status,"STANDARD")
+
 
         pos_x_shoulder_base = self.RobotUtils.SHOULDER_X
         pos_y_shoulder_base = self.RobotUtils.SHOULDER_Y
@@ -67,6 +75,12 @@ class HighLevelMotionController(object):
             local_xyz_des = base_states[i]
             end_effactor = end_effactors[i]
             self.linear_leg_step_to_local_xyz_in_t(end_effactor, local_xyz_des, step_time)
+
+        if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
+            status = "Initilization Finished"
+            self.RobotUtils.ColorPrinter((self.__class__.__name__+"set_inital_config()"),status,"OKGREEN" )
+
+        self.initialization_complete = True
 
 
 
@@ -95,8 +109,8 @@ class HighLevelMotionController(object):
             self.control_loop_calls = 0
             self.first_control_loop = True
 
-        #print_str = "motion queue size: "+str(self.motion_queue.qsize())+ "measured controller dt:"+str(self.measured_controller_dt)
-        #print(print_str)
+        print_str = "motion queue size: "+str(self.motion_queue.qsize())+ "measured controller dt:"+str(self.measured_controller_dt)
+        #print print_str
         if not self.motion_queue.empty():
 
             calculated_next_config = self.motion_queue.get_nowait()
@@ -139,6 +153,13 @@ class HighLevelMotionController(object):
                 self.RobotUtils.ColorPrinter((self.__class__.__name__ + ".make_right_turn()"),status, "FAIL")
             return
 
+        if not self.initialization_complete:
+            if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
+                status = "Initilaization not complete, terminating"
+                self.RobotUtils.ColorPrinter((self.__class__.__name__ + ".make_right_turn()"),status, "FAIL")
+            return
+
+
         self.motion_thread_currently_running = True
 
         if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
@@ -177,6 +198,12 @@ class HighLevelMotionController(object):
             if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
                 status = "Different motion thread is currently running, terminating"
                 self.RobotUtils.ColorPrinter((self.__class__.__name__ + ".make_left_turn()"),status, "FAIL")
+            return
+
+        if not self.initialization_complete:
+            if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
+                status = "Initilaization not complete, terminating"
+                self.RobotUtils.ColorPrinter((self.__class__.__name__ + ".make_right_turn()"),status, "FAIL")
             return
 
         self.motion_thread_currently_running = True
@@ -223,6 +250,12 @@ class HighLevelMotionController(object):
                 self.RobotUtils.ColorPrinter((self.__class__.__name__ + ".forward()"), status, "FAIL")
             return
 
+        if not self.initialization_complete:
+            if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
+                status = "Initilaization not complete, terminating"
+                self.RobotUtils.ColorPrinter((self.__class__.__name__ + ".make_right_turn()"),status, "FAIL")
+            return
+
         self.motion_thread_currently_running = True
 
         if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
@@ -237,7 +270,7 @@ class HighLevelMotionController(object):
         b_l = self.RobotUtils.B_L_FOOT
 
         if self.RobotUtils.PHYSICS_ENABLED:
-            sleep_t = 5
+            sleep_t = 2
         else:
             sleep_t = .5
 
@@ -298,6 +331,12 @@ class HighLevelMotionController(object):
             if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
                 status = "Different motion thread is currently running, terminating"
                 self.RobotUtils.ColorPrinter((self.__class__.__name__ + ".backward()"), status, "FAIL")
+            return
+
+        if not self.initialization_complete:
+            if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
+                status = "Initilaization not complete, terminating"
+                self.RobotUtils.ColorPrinter((self.__class__.__name__ + ".make_right_turn()"),status, "FAIL")
             return
 
         self.motion_thread_currently_running = True
@@ -387,7 +426,6 @@ class HighLevelMotionController(object):
         if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
             self.RobotUtils.ColorPrinter((self.__class__.__name__+"reset_to_base_state()"), "Resetting to base state", "STANDARD")
 
-
         # There are a number of scenarios to consider here
         #
         #   1) robot is currently in the base state                  -> exit function
@@ -402,13 +440,26 @@ class HighLevelMotionController(object):
         # reset legs to base state if not positioned correctly
         for end_affector in self.RobotUtils.end_affectors:
 
+
             link = self.MotionPlanner.get_end_affector_from_end_affector_name(end_affector)
             link_local_xyz = link.getLocalPosition([0,0,0])
             local_end_xyz = self.MotionPlanner.get_local_end_affector_base_state_from_end_affector_name(end_affector)
 
             euclidian_delta = self.RobotUtils.get_euclidian_diff(link_local_xyz, local_end_xyz)
 
+            global_end_xyz = self.MotionPlanner.get_world_xyz_from_local_xyz(local_end_xyz)
+            global_start_xyz = self.MotionPlanner.get_world_xyz_from_local_xyz(link_local_xyz)
+
+            vis.add((end_affector+" END XYZ"), global_end_xyz)
+            vis.add((end_affector+" START XYZ"), global_start_xyz)
+
+            if end_affector == "B_L_FOOT":
+                print "testing: Back Left Foot, euclidean delta:",euclidian_delta, ", min to move:",self.RobotUtils.MINIMUM_DIST_TO_CAUSE_RESET
+                print "current local xyz:",link_local_xyz
+                print "          end xyz:",local_end_xyz
+
             if euclidian_delta > self.RobotUtils.MINIMUM_DIST_TO_CAUSE_RESET:
+                print "RESETTING"
                 self.linear_leg_step_to_local_xyz_in_t(end_affector, local_end_xyz, t)
 
 
@@ -450,12 +501,10 @@ class HighLevelMotionController(object):
         global_start_xyz = link.getWorldPosition([0, 0, 0])
         global_end_xyz = self.MotionPlanner.get_world_xyz_from_local_xyz(local_end_xyz)
 
-        vis.add(link_name,global_end_xyz)
-
         ik_max_deviation = self.RobotUtils.IK_MAX_DEVIATION
 
         if self.RobotUtils.get_euclidian_diff(global_start_xyz, global_end_xyz) < self.RobotUtils.MINIMUM_DIST_TO_CAUSE_RESET:
-            self.RobotUtils.ColorPrinter((self.__class__.__name__+".linear_leg_step_to_local_xyz_in_t():"),("Negiligble change for leg:"+link_name+"Exiting function"), "OKGREEN")
+            self.RobotUtils.ColorPrinter((self.__class__.__name__+".linear_leg_step_to_local_xyz_in_t():"),("Negiligble change for leg:"+link_name+"Exiting function"), "STANDARD")
             return True
 
         t_start = time.time()
@@ -474,7 +523,7 @@ class HighLevelMotionController(object):
 
                 # Failed
                 if not res:
-                    self.RobotUtils.ColorPrinter((self.__class__.__name__+".linear_leg_step_to_local_xyz_in_t()"), "linear_leg_step_to_local_xyz_in_t ik failure", "FAIL")
+                    pass#self.RobotUtils.ColorPrinter((self.__class__.__name__+".linear_leg_step_to_local_xyz_in_t()"), "linear_leg_step_to_local_xyz_in_t ik failure", "FAIL")
 
                 else:
                     if append_to_m_queue:

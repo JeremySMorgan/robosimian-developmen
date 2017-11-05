@@ -29,6 +29,7 @@ class Hypervisor():
         self.world = None
         self.MotionController = None
         self.MotionPlanner = None
+        self.gravity_paused = True
 
 
     def start(self):
@@ -45,27 +46,32 @@ class Hypervisor():
                 raise RuntimeError("Unable to load plane")
 
 
-        self.initialize_visualization(world)
-        self.controller_world = world.copy()
-        self.robosimian = self.controller_world.robot(0)
+        self.planning_world = world.copy()
+
+        if RobotUtils.PHYSICS_ENABLED:
+            self.initialize_visualization(world)
+        else:
+            self.initialize_visualization(self.planning_world)
+
+
+        self.robosimian = self.planning_world.robot(0)
         self.sim =  Simulator(world)
+        self.sim.setGravity([0,0,0])
 
         # Create robot controller
         self.controller = self.sim.controller(0)
         self.controller.setRate(RobotUtils.CONTROLLER_DT)
 
-        self.StabilityManager = StabilityManager(self.robosimian, self.sim, RobotUtils)
+        self.StabilityManager = StabilityManager(world, self.sim, RobotUtils)
 
         # Create HighLevelMotionController
         self.HighLevelMotionController = HighLevelMotionController(self.robosimian, RobotUtils, self.controller)
 
         # Create HighLevelMotionController
-        self.MotionPlanner = MotionPlanner(self.robosimian,RobotUtils)
+        self.MotionPlanner = MotionPlanner(self.robosimian, RobotUtils)
 
-        # Pass the Motion Controller the MotionPlanner and set the initial conifguration
+        # Pass the Motion Controller the MotionPlanner
         self.HighLevelMotionController.initialize_motion_planner(self.MotionPlanner)
-        self.HighLevelMotionController.set_inital_config()
-        self.MotionPlanner.save_base_states()
 
         # User Input
         self.UserInput = UserInput(RobotUtils)
@@ -76,6 +82,10 @@ class Hypervisor():
         RobotUtils.ColorPrinter(self.__class__.__name__,"Hypervisor initialization finished","OKBLUE")
 
         try:
+            
+            if not RobotUtils.PHYSICS_ENABLED:
+                self.HighLevelMotionController.set_inital_config()
+                self.MotionPlanner.save_base_states()
 
             self.UserInput.start()
             self.ObjectiveManager.start_objective_management_loop()
@@ -93,7 +103,7 @@ class Hypervisor():
             self.UserInput.shutdown()
 
 
-    def initialize_visualization(self,world):
+    def initialize_visualization(self, world):
 
         if RobotUtils.SIMULATION_ENABLED:
             vis.add("world", world)
@@ -107,6 +117,8 @@ class Hypervisor():
 
     def run_visualization(self):
 
+        print "Starting visualtization"
+
         while RobotUtils.SIMULATION_ENABLED:
 
 
@@ -114,8 +126,14 @@ class Hypervisor():
             vis.lock()
 
             if RobotUtils.PHYSICS_ENABLED:
-                self.HighLevelMotionController.control_loop()
 
+                if self.gravity_paused:
+                    if self.HighLevelMotionController.initialization_complete:
+                        self.sim.setGravity([0, 0, -9.8])
+                        self.gravity_paused = False
+                        self.MotionPlanner.save_base_states()
+
+                self.HighLevelMotionController.control_loop()
                 self.sim.updateWorld()
                 self.sim.simulate(RobotUtils.CONTROLLER_DT)
                 self.StabilityManager.check_status()

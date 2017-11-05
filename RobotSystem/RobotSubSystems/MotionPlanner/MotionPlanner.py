@@ -25,6 +25,32 @@ class MotionPlanner():
         self.local_b_l_end_affector_base_state = self.b_l_end_affector.getWorldPosition([0, 0, 0])
 
 
+    def legs_make_base_state(self):
+
+        '''
+        @summary: This function returns true if the legs CAN compose a base state, that is that the robot could enter a
+                    base state by only moving the torso
+        @return: boolean
+        '''
+
+        print "legs_make_base_state unimplememnted"
+
+        return None
+
+
+    def get_legs_xyz_yaw(self):
+
+        '''
+        @summary: This function returns the yaw difference between the torso's commanded base state and the
+                    legs' commandedbase state
+        @return: int: angle offset
+        '''
+
+        print "get_legs_xyz_yaw unimplememnted"
+
+        return None
+
+
 
     def get_linear_mid_motion_xyz(self, startXYZ, endXYZ, i, i_max):
 

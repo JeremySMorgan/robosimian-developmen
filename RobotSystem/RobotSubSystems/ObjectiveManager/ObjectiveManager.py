@@ -21,6 +21,7 @@ class ObjectiveManager(object):
         # Threading
         self.robot_motion_thread            = None
         self.obj_manager_update_loop_thread = None
+        self.initializatoin_thread          = None
 
         # Debugging
         self.printed_current_state = False
@@ -29,6 +30,7 @@ class ObjectiveManager(object):
     # Start input loop
     def start_objective_management_loop(self):
 
+        self.initializatoin_thread = MotionThread( self.HighLevelMotionController.set_inital_config, "obj_manager_update_loop")
         self.obj_manager_update_loop_thread = MotionThread( self.obj_manager_update_loop, "obj_manager_update_loop")
 
 
