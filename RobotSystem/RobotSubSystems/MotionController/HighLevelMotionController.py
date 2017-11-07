@@ -261,7 +261,6 @@ class HighLevelMotionController(object):
         if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
             self.RobotUtils.ColorPrinter((self.__class__.__name__+".forward_walk()"), "Starting forward walk", "STANDARD")
 
-        f_extend_state = self.RobotUtils.LEG_F_EXTEND_STATE
         base_state = self.RobotUtils.BASE_STATE
 
         f_r = self.RobotUtils.F_R_FOOT
@@ -369,22 +368,6 @@ class HighLevelMotionController(object):
 
 
 
-    def make_leg_step_by_delta_x(self, end_affector_name, delta_x, MotionThread):
-
-        link =  self.MotionPlanner.get_end_affector_from_end_affector_name(end_affector_name)
-
-        local_xyz = link.getLocalPosition([0,0,0])
-
-        new_x = local_xyz[0] + delta_x
-
-        local_end_xyz = [new_x, local_xyz[1], local_xyz[2]]
-
-        step_time = self.RobotUtils.STEP_TIME
-
-        return self.linear_leg_step_to_local_xyz_in_t(end_affector_name, local_end_xyz, step_time, MotionThread)
-
-
-
     def make_leg_step_to_local_xyz(self, end_affector_name, local_end_xyz, MotionThread):
 
 
@@ -423,47 +406,119 @@ class HighLevelMotionController(object):
 
     def reset_to_base_state(self):
 
+        '''
+        @summary resets the robot to base state. Algorithm ensure stability. see https://github.com/JeremySMorgan/robosimian-gait-development for explanation
+        @return: None
+        '''
+
         if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
             self.RobotUtils.ColorPrinter((self.__class__.__name__+"reset_to_base_state()"), "Resetting to base state", "STANDARD")
 
-        # There are a number of scenarios to consider here
-        #
-        #   1) robot is currently in the base state                  -> exit function
-        #   2) Legs are in base state but torso yaw is rotated       -> rotate torso
-        #   3) Legs are NOT in base state
-        #       3a) if one leg is moved it will be in base state     -> Move that leg
-        #       3b) else
+        default_torso_z = self.robosimian.getConfig()[2]
+        step_time = self.RobotUtils.RESET_LEG_STEP_TIME
+
+        if self.MotionPlanner.legs_make_base_state():
+
+            yaw_offset_deg, xyz_offset = self.MotionPlanner.get_torso_and_legs_delta_yaw_deg_and_xyz_offset()
+
+            print "Legs make base state, shifting torso by:",yaw_offset_deg," degrees and:",xyz_offset
+
+            self.make_torso_rotation(yaw_offset_deg)
+            self.make_torso_shift_from_local_xyz_translation(xyz_offset)
+
+        elif self.MotionPlanner.three_legs_make_base_state():
+
+            end_affector_to_move = self.MotionPlanner.three_legs_make_base_state()
+            print "Three legs compose base state, need to move torso and", end_affector_to_move
+            support_triangle = self.MotionPlanner.get_world_support_triangle_from_excluded_end_affector(end_affector_to_move)
+            q = self.robosimian.getConfig()
+            current_torso_global_x = q[0]
+            current_torso_global_y = q[1]
+
+            # Shift torso to center of support triangle if it is not in it already
+            if not support_triangle.point_is_inside([current_torso_global_x, current_torso_global_y, q[2]]):
+                print "Shifting torso to center of suppoort triangle"
+                global_support_tri_center_xy = support_triangle._2d_center_point()
+                torso_xyz_offset_to_spt_center = [ current_torso_global_x - global_support_tri_center_xy[0], current_torso_global_y-global_support_tri_center_xy[1],0]
+                self.make_torso_shift_from_local_xyz_translation(torso_xyz_offset_to_spt_center)
+                print "Torso shifted to center of support triangle"
 
 
-        t = self.RobotUtils.RESET_LEG_STEP_TIME
-
-        # reset legs to base state if not positioned correctly
-        for end_affector in self.RobotUtils.end_affectors:
-
-
-            link = self.MotionPlanner.get_end_affector_from_end_affector_name(end_affector)
-            link_local_xyz = link.getLocalPosition([0,0,0])
-            local_end_xyz = self.MotionPlanner.get_local_end_affector_base_state_from_end_affector_name(end_affector)
-
-            euclidian_delta = self.RobotUtils.get_euclidian_diff(link_local_xyz, local_end_xyz)
-
-            global_end_xyz = self.MotionPlanner.get_world_xyz_from_local_xyz(local_end_xyz)
-            global_start_xyz = self.MotionPlanner.get_world_xyz_from_local_xyz(link_local_xyz)
-
-            vis.add((end_affector+" END XYZ"), global_end_xyz)
-            vis.add((end_affector+" START XYZ"), global_start_xyz)
-
-            if end_affector == "B_L_FOOT":
-                print "testing: Back Left Foot, euclidean delta:",euclidian_delta, ", min to move:",self.RobotUtils.MINIMUM_DIST_TO_CAUSE_RESET
-                print "current local xyz:",link_local_xyz
-                print "          end xyz:",local_end_xyz
-
-            if euclidian_delta > self.RobotUtils.MINIMUM_DIST_TO_CAUSE_RESET:
-                print "RESETTING"
-                self.linear_leg_step_to_local_xyz_in_t(end_affector, local_end_xyz, t)
+            # Step leg to base position
+            yaw_offset_deg_to_base, xyz_offset_to_base = self.MotionPlanner.get_torso_and_legs_delta_yaw_deg_and_xyz_offset(excluded_leg=end_affector_to_move)
+            local_leg_xyz_base_position = self.MotionPlanner.get_local_end_affector_base_state_from_torso_translation(end_affector_to_move, xyz_offset_to_base, yaw_offset_deg_to_base)
 
 
+            print "making leg step to base position"
+            self.linear_leg_step_to_local_xyz_in_t(end_affector_to_move, local_leg_xyz_base_position, step_time)
+            print "Leg in base position"
 
+            # Move torso to base position
+            print "shifting torso to base position"
+            self.make_torso_shift_from_local_xyz_translation(xyz_offset_to_base)
+            print "torso shifted to base position"
+            print "rotating torso to base rotation"
+            self.make_torso_rotation(yaw_offset_deg_to_base)
+            print "torso rotated to base position"
+
+        else:
+
+            curr_torso_x = self.robosimian.getConfig()[0]
+            curr_torso_y = self.robosimian.getConfig()[1]
+            curr_torso_z = self.robosimian.getConfig()[2]
+
+            P_0bl = self.MotionPlanner.b_l_end_affector.getWorldPosition([0,0,0])
+            P_0br = self.MotionPlanner.b_r_end_affector.getWorldPosition([0,0,0])
+            P_0fl = self.MotionPlanner.f_l_end_affector.getWorldPosition([0,0,0])
+            P_0fr = self.MotionPlanner.f_r_end_affector.getWorldPosition([0,0,0])
+
+            B_bl  = self.MotionPlanner.get_world_xyz_from_local_xyz(self.MotionPlanner.get_local_end_affector_base_state_from_end_affector_name(self.RobotUtils.B_L_FOOT))
+            B_br  = self.MotionPlanner.get_world_xyz_from_local_xyz(self.MotionPlanner.get_local_end_affector_base_state_from_end_affector_name(self.RobotUtils.B_R_FOOT))
+            B_fl  = self.MotionPlanner.get_world_xyz_from_local_xyz(self.MotionPlanner.get_local_end_affector_base_state_from_end_affector_name(self.RobotUtils.F_L_FOOT))
+            B_fr  = self.MotionPlanner.get_world_xyz_from_local_xyz(self.MotionPlanner.get_local_end_affector_base_state_from_end_affector_name(self.RobotUtils.F_R_FOOT))
+            B_t   = [curr_torso_x, curr_torso_y, curr_torso_z]
+
+            # --- left legs
+
+            front_left_support_triangle = self.MotionPlanner.get_support_polygon_from_points([P_0bl, P_0fr, P_0br])
+            back_left_support_triangle   = self.MotionPlanner.get_support_polygon_from_points([B_fl, P_0fr, P_0br])
+
+            # Shift torso to Pt
+            Pt = self.MotionPlanner.get_centroid_of_support_polygon_intersection( front_left_support_triangle, back_left_support_triangle)
+            Pt = [Pt[0],Pt[1], curr_torso_z]
+
+            print "pt: ",Pt
+
+            vis.add("Pt", Pt)
+
+            print "shifting torso to Pt"
+            self.make_torso_shift_to_world_xyz(Pt)
+
+
+            # make leg steps to place left feet in base positions
+
+            print "back left steo to B_bl"
+            vis.add("back left step end",B_bl)
+            self.linear_leg_step_to_global_xyz_in_t( self.RobotUtils.B_L_FOOT, B_bl, step_time)
+
+
+            print "front left steo to B_fl"
+            vis.add("fron left step end",B_fl)
+            self.linear_leg_step_to_global_xyz_in_t( self.RobotUtils.F_L_FOOT, B_fl, step_time)
+
+
+            # --- right legs
+
+            front_right_support_triangle = self.MotionPlanner.get_support_polygon_from_points([B_fl, B_bl, B_fr])
+            back_right_support_triangle = self.MotionPlanner.get_support_polygon_from_points([B_fl, B_bl, P_0fr])
+
+            Pt2 = self.MotionPlanner.get_centroid_of_support_polygon_intersection(front_right_support_triangle, back_right_support_triangle )
+            Pt2 = [Pt2[0],Pt2[1], curr_torso_z]
+
+            self.shift_torso_to_global_xyz(Pt2)
+            self.linear_leg_step_to_global_xyz_in_t(self.RobotUtils.F_R_FOOT, B_fr, step_time)
+            self.linear_leg_step_to_global_xyz_in_t(self.RobotUtils.B_R_FOOT, B_br, step_time)
+            self.shift_torso_to_global_xyz(B_t)
 
 
     #                                      Threaded Moiton in Speficied Time APIS
@@ -474,8 +529,76 @@ class HighLevelMotionController(object):
     #       thread they are being run in is suspended, otherwise true
     #
     # Contains:
+    #           - linear_leg_step_to_global_xyz_in_t
     #           - linear_leg_step_to_local_xyz_in_t
     #           - make_torso_shift_from_local_xyz_translation
+
+
+    def linear_leg_step_to_global_xyz_in_t(self, link_name, global_end_xyz, step_time, MotionThread=None, append_to_m_queue=True):
+
+        """
+        @param link_name: link name to move
+        @param global_end_xyz: local xyz destination
+        @param step_time: amount of time to perform the step in
+        @param MotionThread
+        @return: False if thread was suspended mid step. True otherwise
+        """
+
+        link = self.get_end_affector_from_end_affector_name(link_name)
+
+        # Retrieve appropriate variables
+        active_dofs = self.get_active_dofs_from_end_affector_name(link_name)
+        desired_orientation = self.MotionPlanner.get_desired_end_affector_rotation(link_name)
+
+        # Time calculations
+        delay = self.measured_controller_dt
+        i_max = int( step_time / float(delay))
+
+        global_start_xyz = link.getWorldPosition([0, 0, 0])
+
+        ik_max_deviation = self.RobotUtils.IK_MAX_DEVIATION
+
+        if self.RobotUtils.get_euclidian_diff(global_start_xyz, global_end_xyz) < self.RobotUtils.MINIMUM_DIST_TO_CAUSE_RESET:
+            self.RobotUtils.ColorPrinter((self.__class__.__name__+".linear_leg_step_to_local_xyz_in_t():"),("Negiligble change for leg:"+link_name+"Exiting function"), "STANDARD")
+            return True
+
+        t_start = time.time()
+
+        for i in range(i_max):
+
+            if MotionThread is None or ( (not MotionThread is None ) and MotionThread.is_alive()):
+
+                xyz_des = self.MotionPlanner.get_linear_mid_motion_xyz(global_start_xyz, global_end_xyz, i, i_max)
+                goal = ik.objective(link, R=desired_orientation, t=xyz_des)
+
+
+                res = ik.solve_nearby(goal, activeDofs=active_dofs, maxDeviation=ik_max_deviation,
+                                      feasibilityCheck=self.RobotUtils.always_true_func)
+
+                # Failed
+                if not res:
+                    self.RobotUtils.ColorPrinter((self.__class__.__name__+".linear_leg_step_to_local_xyz_in_t()"), "linear_leg_step_to_local_xyz_in_t ik failure", "FAIL")
+
+                else:
+                    if append_to_m_queue:
+                        self.add_q_to_motion_queue(self.robosimian.getConfig())
+
+                time.sleep(delay)
+                delay = self.measured_controller_dt
+
+            else:
+                if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
+                    status = "Suspending motion thread for: " + link_name + " linear motion"
+                    self.RobotUtils.ColorPrinter(self.__class__.__name__, status, "FAIL")
+                return False
+
+        t_total = time.time() - t_start
+        print( ("Step took: "+str(t_total)+"seconds") )
+
+        return True
+
+
+
 
 
     def linear_leg_step_to_local_xyz_in_t(self, link_name, local_end_xyz, step_time, MotionThread=None, append_to_m_queue=True):
@@ -523,7 +646,7 @@ class HighLevelMotionController(object):
 
                 # Failed
                 if not res:
-                    pass#self.RobotUtils.ColorPrinter((self.__class__.__name__+".linear_leg_step_to_local_xyz_in_t()"), "linear_leg_step_to_local_xyz_in_t ik failure", "FAIL")
+                    self.RobotUtils.ColorPrinter((self.__class__.__name__+".linear_leg_step_to_local_xyz_in_t()"), "linear_leg_step_to_local_xyz_in_t ik failure", "FAIL")
 
                 else:
                     if append_to_m_queue:
@@ -544,7 +667,60 @@ class HighLevelMotionController(object):
         return True
 
 
-    def make_torso_shift_from_local_xyz_translation(self, xyz_translation, MotionThread):
+    def make_torso_shift_to_world_xyz(self, world_xyz, MotionThread=None):
+
+        """
+
+        @param xyz_translation: local xyz destination for torso shift
+        @param MotionThread:    parent Motion Thread
+        @return: False if thread was suspended mid step. True otherwise
+        """
+
+        # Time calculations
+        delay = self.measured_controller_dt
+        i_max = int(self.RobotUtils.TORSO_SHIFT_TIME / delay)
+
+        global_xyz_start = self.MotionPlanner.get_world_xyz_from_local_xyz([0, 0, 0])
+
+        start_x = global_xyz_start[0]
+        start_y = global_xyz_start[1]
+        start_z = global_xyz_start[2]
+
+        end_x = world_xyz[0]
+        end_y = world_xyz[1]
+        end_z = world_xyz[2]
+
+        x_delta = end_x - start_x
+        y_delta = end_y - start_y
+        z_delta = end_z - start_z
+
+        for i in range(i_max):
+
+
+            if MotionThread is None or ( (not MotionThread is None ) and MotionThread.is_alive()):
+
+
+                global_x = start_x + ((float(i) / float(i_max)) * x_delta)
+                global_y = start_y + ((float(i) / float(i_max)) * y_delta)
+                global_z = start_z + ((float(i) / float(i_max)) * z_delta)
+
+                global_xyz = [global_x, global_y, global_z]
+
+                self.shift_torso_to_global_xyz(global_xyz)
+
+                self.add_q_to_motion_queue(self.robosimian.getConfig())
+
+                time.sleep(delay)
+                delay = self.measured_controller_dt
+
+            else:
+                if self.RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
+                    self.RobotUtils.ColorPrinter((self.__class__.__name__+"make_torso_shift_from_local_xyz_translation()"), "Suspending motion thread", "FAIL")
+                return False
+
+        return True
+
+    def make_torso_shift_from_local_xyz_translation(self, xyz_translation, MotionThread=None):
 
         """
 
@@ -600,7 +776,15 @@ class HighLevelMotionController(object):
 
 
 
-    def make_torso_rotation(self, degree, MotionThread):
+    def make_torso_rotation(self, degree, MotionThread=None):
+
+        '''
+
+        @param degree: degree offset to rotate torso by
+        @param MotionThread: MotionThread containing this torso rotation
+        @return: True if success, False if motion thread stopped midway through
+        '''
+
 
         offset = 1
         delay = self.measured_controller_dt
@@ -611,7 +795,8 @@ class HighLevelMotionController(object):
 
         for i in range(i_max):
 
-            if MotionThread.is_alive():
+            if MotionThread is None or ((not MotionThread is None) and MotionThread.is_alive()):
+
                 self.rotate_torso_from_yaw_offset(offset)
                 time.sleep(delay)
                 delay = self.measured_controller_dt

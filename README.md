@@ -25,12 +25,14 @@ let:
 if 4 legs make a base state B, regardless of torso position:
 	Shift and rotate torso to torso position P commanded by B
 else if 3 legs make a base state B, regardless of torso position:
-	shift torso to the center of the support triangle defined by three legs in base state
+    let ST_t = the support triangle defined by the three legs currently in the base state
+    if the current torso position is not in ST_t:
+	    shift torso to the center of ST_t
 	step 4th leg that is not in B to commanded base state defined by B
-	shift torso to P
+	shift torso to B_t
 else:
 	# Move left legs (first stage)
-	let ST_fr = tri( P_0bl, P_0fr, P_0br)
+	let ST_fl = tri( P_0bl, P_0fr, P_0br)
 	let ST_bl = tri( B_fl, P_0fr, P_0br)
 	let Pt = middle point in area defined by ( ST_fr intersection ST_bl ) 
 	shift torso to Pt
@@ -40,15 +42,11 @@ else:
 	# Move right legs (second stage)
 	let ST_fr = tri(B_br, B_bl, B_fl)
 	let ST_bf = tri( P_0fr, B_bl, B_fl )
-	if B_t is contained in area defined by ( ST_fr intersection ST_br ):
-		shift torso to B_t
-		front right leg to B_fr
-		back right to B_br
-	else:
-		shift torso to middle point in area defined by (ST_fr intersection ST_br)
-		front right to B_fr
-		back right to B_br
-		shift torso to B_t
+
+    shift torso to middle point in area defined by (ST_fr intersection ST_br)
+    front right to B_fr
+    back right to B_br
+    shift torso to B_t
 ```
 
 ![Reset Stage 1](https://github.com/JeremySMorgan/robosimian-gait-development/blob/master/reset_stage_1.png)

@@ -6,10 +6,13 @@ from klampt import vis
 
 class MotionPlanner():
 
-    def __init__(self,robot,RobotUtils):
+    def __init__(self,robot,RobotUtils, Vector, SupportPolygon):
 
         self.robosimian = robot
         self.RobotUtils = RobotUtils
+
+        self.Vector = Vector
+        self._2DSupportPolygon = SupportPolygon
 
         self.f_r_end_affector = self.robosimian.link(self.RobotUtils.f_r_active_dofs[len(self.RobotUtils.f_r_active_dofs) - 1])
         self.f_l_end_affector = self.robosimian.link(self.RobotUtils.f_l_active_dofs[len(self.RobotUtils.f_l_active_dofs) - 1])
@@ -33,22 +36,202 @@ class MotionPlanner():
         @return: boolean
         '''
 
-        print "legs_make_base_state unimplememnted"
+        f_l_curr = self.f_l_end_affector.getWorldPosition([0, 0, 0])
+        f_r_curr = self.f_r_end_affector.getWorldPosition([0, 0, 0])
+        b_l_curr = self.b_l_end_affector.getWorldPosition([0, 0, 0])
+        b_r_curr = self.b_r_end_affector.getWorldPosition([0, 0, 0])
 
-        return None
+        f_l_base = self.local_f_l_end_affector_base_state
+        f_r_base = self.local_f_r_end_affector_base_state
+        b_l_base = self.local_b_l_end_affector_base_state
+        b_r_base = self.local_b_r_end_affector_base_state
+
+        f_l_vector = self.Vector( [ (f_l_base[0] - f_l_curr[0]), (f_l_base[1] - f_l_curr[1]), (f_l_base[2] - f_l_curr[2])  ])
+        f_r_vector = self.Vector( [ (f_r_base[0] - f_r_curr[0]), (f_r_base[1] - f_r_curr[1]), (f_r_base[2] - f_r_curr[2])  ])
+        b_l_vector = self.Vector( [ (b_l_base[0] - b_l_curr[0]), (b_l_base[1] - b_l_curr[1]), (b_l_base[2] - b_l_curr[2])  ])
+        b_r_vector = self.Vector( [ (b_r_base[0] - b_r_curr[0]), (b_r_base[1] - b_r_curr[1]), (b_r_base[2] - b_r_curr[2])  ])
+
+        if f_l_vector.multiple_vector_directions_are_equal([f_r_vector, b_l_vector, b_r_vector]):
+            if f_r_vector.multiple_vector_directions_are_equal([b_l_vector, b_r_vector]):
+                if b_l_vector.multiple_vector_directions_are_equal([b_r_vector]):
+                    return True
+        return False
 
 
-    def get_legs_xyz_yaw(self):
+
+    def three_legs_make_base_state(self):
+
+        '''
+        @summary: This function returns true if the legs CAN compose a base state, that is that the robot could enter a
+                    base state by only moving the torso and one leg.
+        @return: end affector name of fourth leg that can be moved to make the legs into a base state (definied in RobotUtils)
+        '''
+
+        f_l_curr = self.f_l_end_affector.getWorldPosition([0, 0, 0])
+        f_r_curr = self.f_r_end_affector.getWorldPosition([0, 0, 0])
+        b_l_curr = self.b_l_end_affector.getWorldPosition([0, 0, 0])
+        b_r_curr = self.b_r_end_affector.getWorldPosition([0, 0, 0])
+
+        f_l_base = self.local_f_l_end_affector_base_state
+        f_r_base = self.local_f_r_end_affector_base_state
+        b_l_base = self.local_b_l_end_affector_base_state
+        b_r_base = self.local_b_r_end_affector_base_state
+
+
+        f_l_vector = self.Vector( [ (f_l_base[0] - f_l_curr[0]), (f_l_base[1] - f_l_curr[1]), (f_l_base[2] - f_l_curr[2])  ])
+        f_r_vector = self.Vector( [ (f_r_base[0] - f_r_curr[0]), (f_r_base[1] - f_r_curr[1]), (f_r_base[2] - f_r_curr[2])  ])
+        b_l_vector = self.Vector( [ (b_l_base[0] - b_l_curr[0]), (b_l_base[1] - b_l_curr[1]), (b_l_base[2] - b_l_curr[2])  ])
+        b_r_vector = self.Vector( [ (b_r_base[0] - b_r_curr[0]), (b_r_base[1] - b_r_curr[1]), (b_r_base[2] - b_r_curr[2])  ])
+
+        # Front right
+        if f_l_vector.multiple_vector_directions_are_equal([b_l_vector, b_r_vector]) and not f_l_vector.vector_directions_are_equal(f_r_vector):
+            return self.RobotUtils.F_R_FOOT
+
+        # Front left
+        if f_r_vector.multiple_vector_directions_are_equal([b_l_vector, b_r_vector]) and not f_r_vector.vector_directions_are_equal(f_l_vector):
+            return self.RobotUtils.F_L_FOOT
+
+        # Back left
+        if b_r_vector.multiple_vector_directions_are_equal([f_r_vector, f_l_vector]) and not b_r_vector.vector_directions_are_equal(b_l_vector):
+            return self.RobotUtils.B_L_FOOT
+
+        # Back right
+        if b_l_vector.multiple_vector_directions_are_equal([f_r_vector, f_l_vector]) and not b_l_vector.vector_directions_are_equal(b_r_vector):
+            return self.RobotUtils.B_R_FOOT
+
+        return False
+
+
+    def get_world_support_triangle_from_excluded_end_affector(self, excluded_end_effector):
+
+        '''
+        @summary returns a support triangle made by all end affectors except for the one specified
+        @param excluded_end_effector: name of end affector to exclude from support triangle
+        @return: SupportTriangle
+        '''
+
+        end_affectors = []
+        end_affectors_temp = self.RobotUtils.end_affectors
+        for end_affector in end_affectors_temp:
+            end_affectors.append(end_affector)
+
+        end_affectors.remove(excluded_end_effector)
+
+        P = []
+        for end_affector in end_affectors:
+            link = self.get_end_affector_from_end_affector_name(end_affector)
+            link_world_xyz = link.getWorldPosition([0,0,0])
+            P.append(link_world_xyz)
+
+        support_tri = self._2DSupportPolygon(P)
+
+        return support_tri
+
+
+    def get_support_polygon_from_points(self, P):
+
+        '''
+        @summary returns a _2DSupportPolygon created by the parameterized array of Points
+        @param P: list of xyz coordinates
+        @return: _2DSupportPolygon object
+        '''
+
+        return self._2DSupportPolygon(P)
+
+    def point_is_in_support_polygon_intersection(self, support_poly1, support_poly2, P):
+
+        '''
+        @summary returns whether a point is inside the intersection of two _2DSupportPolygon
+        @param support_poly1: _2DSupportPolygon
+        @param support_poly2: _2DSupportPolygon
+        @param P: [x,y,z] array
+        @return: boolean
+        '''
+
+        return support_poly1.support_poly_is_in_intersection_with_other_2d_support_poly(support_poly2, P)
+
+
+    def get_centroid_of_support_polygon_intersection(self, support_poly1, support_poly2):
+
+        '''
+        @summary this function returns the xy centroid of the intersection of two _2DSupportPolygon objects
+        @param support_poly1: _2DSupportPolygon
+        @param support_poly2: _2DSupportPolygon
+        @return: [x, y]
+        '''
+
+        return support_poly1.xy_centroid_of_intersection(support_poly2)
+
+
+    def get_torso_and_legs_delta_yaw_deg_and_xyz_offset(self, excluded_leg = None):
 
         '''
         @summary: This function returns the yaw difference between the torso's commanded base state and the
-                    legs' commandedbase state
+                    legs' commandedbase state. If excluded leg as passed, this functino will not use that leg in
+                    its calculations
         @return: int: angle offset
         '''
 
-        print "get_legs_xyz_yaw unimplememnted"
+        f_l_world = self.f_l_end_affector.getWorldPosition([0, 0, 0])
+        f_r_world = self.f_r_end_affector.getWorldPosition([0, 0, 0])
+        b_l_world = self.b_l_end_affector.getWorldPosition([0, 0, 0])
+        b_r_world = self.b_r_end_affector.getWorldPosition([0, 0, 0])
 
-        return None
+        q = self.robosimian.getConfig()
+        robot_world_x = q[0]
+        robot_world_y = q[1]
+
+        if excluded_leg:
+
+            print "End affectors:",self.RobotUtils.end_affectors
+            print "excluded_leg:",excluded_leg
+
+            if not excluded_leg in self.RobotUtils.end_affectors:
+                self.RobotUtils.ColorPrinter((self.__class__.__name__ + ".get_legs_xyz_yaw()"),
+                                             "Error: excluded leg is a valid end affector name", "FAIL")
+                return False
+
+
+            if excluded_leg == self.RobotUtils.B_R_FOOT or excluded_leg == self.RobotUtils.F_L_FOOT:
+                diaganol_pos_1 = b_l_world
+                diaganol_pos_2 = f_r_world
+
+            else:
+                diaganol_pos_1 = b_r_world
+                diaganol_pos_2 = f_l_world
+
+            if excluded_leg in self.RobotUtils.left_feet:
+                legs_x_delta = f_r_world[0] - b_r_world[0]
+                legs_y_delta = f_r_world[1] - b_r_world[1]
+
+            else:
+                legs_x_delta = f_l_world[0] - b_l_world[0]
+                legs_y_delta = f_l_world[1] - b_l_world[1]
+
+            legs_commanded_x  = (diaganol_pos_1[0] + diaganol_pos_2[0]) / 2.0
+            legs_commanded_y  = (diaganol_pos_1[1] + diaganol_pos_2[1]) / 2.0
+
+            xyz_offset = [legs_commanded_x - robot_world_x, legs_commanded_y - robot_world_y, 0]
+
+        else:
+
+            if not self.legs_make_base_state():
+                self.RobotUtils.ColorPrinter((self.__class__.__name__+".get_legs_xyz_yaw()"),"Error: Legs do not make a base state","FAIL")
+
+            legs_x_delta = f_l_world[0] - b_l_world[0]
+            legs_y_delta = f_l_world[1] - b_l_world[1]
+
+            legs_commanded_x  = (f_l_world[0] + f_r_world[0] + b_l_world[0] + b_r_world[0]) / 4
+            legs_commanded_y  = (f_l_world[1] + f_r_world[1] + b_l_world[1] + b_r_world[1]) / 4
+
+            xyz_offset = [  legs_commanded_x- robot_world_x,  legs_commanded_y - robot_world_y, 0]
+
+
+        legs_yaw_degree = math.degrees(math.atan(legs_y_delta / legs_x_delta))
+
+        return legs_yaw_degree, xyz_offset
+
+
 
 
 
@@ -152,7 +335,15 @@ class MotionPlanner():
         return translated_and_rotated_point
 
 
+
     def get_local_end_affector_base_state_from_torso_translation(self, leg, translation, yaw_rotation_offset_degrees):
+
+        '''
+        @param leg: string from RobotUtils specifying end affector
+        @param translation: torso translation
+        @param yaw_rotation_offset_degrees: yaw rotation
+        @return: return the local end position commanded by the torso and yaw offset
+        '''
 
         yaw_rot_offset = math.radians(yaw_rotation_offset_degrees)
 

@@ -14,7 +14,8 @@ from RobotSubSystems.ObjectiveManager.ObjectiveManager import ObjectiveManager
 from RobotSubSystems.UserInput.UserInput import UserInput
 from RobotSubSystems.StabilityManager.StabilityManager import StabilityManager
 from Utilities.RobotUtils.RobotUtils import RobotUtils
-
+from Utilities.Vector.Vector import Vector
+from Utilities.SupportPolygon._2DSupportPolygon import _2DSupportPolygon
 
 if RobotUtils.SIMULATION_ENABLED:
     from klampt import vis
@@ -53,7 +54,6 @@ class Hypervisor():
         else:
             self.initialize_visualization(self.planning_world)
 
-
         self.robosimian = self.planning_world.robot(0)
         self.sim =  Simulator(world)
         self.sim.setGravity([0,0,0])
@@ -68,7 +68,7 @@ class Hypervisor():
         self.HighLevelMotionController = HighLevelMotionController(self.robosimian, RobotUtils, self.controller)
 
         # Create HighLevelMotionController
-        self.MotionPlanner = MotionPlanner(self.robosimian, RobotUtils)
+        self.MotionPlanner = MotionPlanner(self.robosimian, RobotUtils, Vector, _2DSupportPolygon)
 
         # Pass the Motion Controller the MotionPlanner
         self.HighLevelMotionController.initialize_motion_planner(self.MotionPlanner)
@@ -117,10 +117,7 @@ class Hypervisor():
 
     def run_visualization(self):
 
-        print "Starting visualtization"
-
         while RobotUtils.SIMULATION_ENABLED:
-
 
             # Update model
             vis.lock()

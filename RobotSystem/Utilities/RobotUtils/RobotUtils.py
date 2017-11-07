@@ -46,8 +46,8 @@ class RobotUtils(object):
 
     left_feet = [F_L_FOOT, B_L_FOOT]
     right_feet = [F_R_FOOT, B_R_FOOT]
-    end_affectors = [ F_R_FOOT, F_L_FOOT, B_R_FOOT, B_L_FOOT]
-    leg_states = [LEG_B_EXTEND_STATE,LEG_BASE_STATE,LEG_F_EXTEND_STATE]
+    end_affectors = [F_R_FOOT, F_L_FOOT, B_R_FOOT, B_L_FOOT]
+    leg_states = [ LEG_B_EXTEND_STATE, LEG_BASE_STATE, LEG_F_EXTEND_STATE]
 
     # App wide multithreading constants
     KEEP_THREAD_ALIVE                   = "thread_is_alive"
