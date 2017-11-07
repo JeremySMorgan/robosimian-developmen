@@ -49,7 +49,7 @@ else:
     shift torso to B_t
 ```
 
-![Reset Stage 1](https://github.com/JeremySMorgan/robosimian-gait-development/blob/master/reset_stage_1.png)
+![Reset Stage 1](https://github.com/JeremySMorgan/robosimian-gait-development/blob/master/torso_stage_1.png)
 
 ![Reset Stage 1](https://github.com/JeremySMorgan/robosimian-gait-development/blob/master/reset_stage_2.png)
 
