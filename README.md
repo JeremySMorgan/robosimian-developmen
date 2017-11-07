@@ -34,7 +34,7 @@ else:
 	# Move left legs (first stage)
 	let ST_fl = tri( P_0bl, P_0fr, P_0br)
 	let ST_bl = tri( B_fl, P_0fr, P_0br)
-	let Pt = middle point in area defined by ( ST_fr intersection ST_bl ) 
+	let Pt = middle point in area defined by ( ST_fr intersection ST_bl )
 	shift torso to Pt
 	back left leg step to B_bl
 	front left leg step to B_fl

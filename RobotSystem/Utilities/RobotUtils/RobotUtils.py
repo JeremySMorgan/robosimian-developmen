@@ -106,11 +106,11 @@ class RobotUtils(object):
 
     else:
         INITIALIZATION_STEP_TIME            = .5
-        RESET_LEG_STEP_TIME                 = 3
-        TURN_TIME                           = 3
+        RESET_LEG_STEP_TIME                 = 4
+        TURN_TIME                           = 1.5
         TORSO_SHIFT_TIME                    = 3
-        STEP_TIME                           = 3
-        TORSO_YAW_ROTATE_TIME               = 3
+        STEP_TIME                           = 1.5
+        TORSO_YAW_ROTATE_TIME               = 1.5
 
 
     @staticmethod

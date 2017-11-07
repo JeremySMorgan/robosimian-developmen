@@ -416,6 +416,7 @@ class HighLevelMotionController(object):
 
         default_torso_z = self.robosimian.getConfig()[2]
         step_time = self.RobotUtils.RESET_LEG_STEP_TIME
+        sleep_t = 5
 
         if self.MotionPlanner.legs_make_base_state():
 
@@ -487,11 +488,8 @@ class HighLevelMotionController(object):
             Pt = self.MotionPlanner.get_centroid_of_support_polygon_intersection( front_left_support_triangle, back_left_support_triangle)
             Pt = [Pt[0],Pt[1], curr_torso_z]
 
-            print "pt: ",Pt
-
             vis.add("Pt", Pt)
-
-            print "shifting torso to Pt"
+            time.sleep(sleep_t)
             self.make_torso_shift_to_world_xyz(Pt)
 
 
@@ -499,11 +497,13 @@ class HighLevelMotionController(object):
 
             print "back left steo to B_bl"
             vis.add("back left step end",B_bl)
+            time.sleep(sleep_t)
             self.linear_leg_step_to_global_xyz_in_t( self.RobotUtils.B_L_FOOT, B_bl, step_time)
 
 
             print "front left steo to B_fl"
             vis.add("fron left step end",B_fl)
+            time.sleep(sleep_t)
             self.linear_leg_step_to_global_xyz_in_t( self.RobotUtils.F_L_FOOT, B_fl, step_time)
 
 
@@ -515,11 +515,27 @@ class HighLevelMotionController(object):
             Pt2 = self.MotionPlanner.get_centroid_of_support_polygon_intersection(front_right_support_triangle, back_right_support_triangle )
             Pt2 = [Pt2[0],Pt2[1], curr_torso_z]
 
+            vis.add("pt2", Pt2)
+            time.sleep(sleep_t)
+            print "Shifting torso to Pt2"
             self.shift_torso_to_global_xyz(Pt2)
-            self.linear_leg_step_to_global_xyz_in_t(self.RobotUtils.F_R_FOOT, B_fr, step_time)
-            self.linear_leg_step_to_global_xyz_in_t(self.RobotUtils.B_R_FOOT, B_br, step_time)
-            self.shift_torso_to_global_xyz(B_t)
 
+            vis.add("b_fr", B_fr)
+            time.sleep(sleep_t)
+            print "front right step to B_fr"
+            self.linear_leg_step_to_global_xyz_in_t(self.RobotUtils.F_R_FOOT, B_fr, step_time)
+
+            vis.add("B_br", B_br)
+            time.sleep(sleep_t)
+            print "front right step to B_br"
+            self.linear_leg_step_to_global_xyz_in_t(self.RobotUtils.B_R_FOOT, B_br, step_time)
+
+
+            vis.add("B_t", B_t)
+            time.sleep(sleep_t)
+            print "Shifting torso to B_t"
+            self.shift_torso_to_global_xyz(B_t)
+            time.sleep(sleep_t)
 
     #                                      Threaded Moiton in Speficied Time APIS
     # -----------------------------------                                         ------------------------------------
@@ -559,7 +575,7 @@ class HighLevelMotionController(object):
         ik_max_deviation = self.RobotUtils.IK_MAX_DEVIATION
 
         if self.RobotUtils.get_euclidian_diff(global_start_xyz, global_end_xyz) < self.RobotUtils.MINIMUM_DIST_TO_CAUSE_RESET:
-            self.RobotUtils.ColorPrinter((self.__class__.__name__+".linear_leg_step_to_local_xyz_in_t():"),("Negiligble change for leg:"+link_name+"Exiting function"), "STANDARD")
+            self.RobotUtils.ColorPrinter((self.__class__.__name__+".linear_leg_step_to_global_xyz_in_t():"),("Negiligble change for leg:"+link_name+"Exiting function"), "STANDARD")
             return True
 
         t_start = time.time()
@@ -577,7 +593,7 @@ class HighLevelMotionController(object):
 
                 # Failed
                 if not res:
-                    self.RobotUtils.ColorPrinter((self.__class__.__name__+".linear_leg_step_to_local_xyz_in_t()"), "linear_leg_step_to_local_xyz_in_t ik failure", "FAIL")
+                    self.RobotUtils.ColorPrinter((self.__class__.__name__+".linear_leg_step_to_global_xyz_in_t()"), " ik failure", "FAIL")
 
                 else:
                     if append_to_m_queue:
@@ -646,7 +662,7 @@ class HighLevelMotionController(object):
 
                 # Failed
                 if not res:
-                    self.RobotUtils.ColorPrinter((self.__class__.__name__+".linear_leg_step_to_local_xyz_in_t()"), "linear_leg_step_to_local_xyz_in_t ik failure", "FAIL")
+                    self.RobotUtils.ColorPrinter((self.__class__.__name__+".linear_leg_step_to_local_xyz_in_t()"), "ik failure", "FAIL")
 
                 else:
                     if append_to_m_queue:
