@@ -5,6 +5,8 @@ import Queue
 from klampt.model import ik
 from klampt import vis
 import time
+from shapely.geometry import Point
+from shapely.geometry.polygon import Polygon
 
 class HighLevelMotionController(object):
 
@@ -37,7 +39,7 @@ class HighLevelMotionController(object):
     # Desc: Initiates self
     #
     # Contains:
-    #           - initialize_motion_planner
+    #           - initialize_motion_plannerR
     #           - set_inital_config
 
 
@@ -416,7 +418,8 @@ class HighLevelMotionController(object):
 
         default_torso_z = self.robosimian.getConfig()[2]
         step_time = self.RobotUtils.RESET_LEG_STEP_TIME
-        sleep_t = 5
+        sleep_t = 4
+        end_affector_movement_radius = self.RobotUtils.END_AFFECTOR_RADIUS
 
         if self.MotionPlanner.legs_make_base_state():
 
@@ -449,7 +452,6 @@ class HighLevelMotionController(object):
             yaw_offset_deg_to_base, xyz_offset_to_base = self.MotionPlanner.get_torso_and_legs_delta_yaw_deg_and_xyz_offset(excluded_leg=end_affector_to_move)
             local_leg_xyz_base_position = self.MotionPlanner.get_local_end_affector_base_state_from_torso_translation(end_affector_to_move, xyz_offset_to_base, yaw_offset_deg_to_base)
 
-
             print "making leg step to base position"
             self.linear_leg_step_to_local_xyz_in_t(end_affector_to_move, local_leg_xyz_base_position, step_time)
             print "Leg in base position"
@@ -463,6 +465,9 @@ class HighLevelMotionController(object):
             print "torso rotated to base position"
 
         else:
+
+
+            # TODO: Ensure that all legs are on the ground before starting
 
             curr_torso_x = self.robosimian.getConfig()[0]
             curr_torso_y = self.robosimian.getConfig()[1]
@@ -481,11 +486,20 @@ class HighLevelMotionController(object):
 
             # --- left legs
 
-            front_left_support_triangle = self.MotionPlanner.get_support_polygon_from_points([P_0bl, P_0fr, P_0br])
-            back_left_support_triangle   = self.MotionPlanner.get_support_polygon_from_points([B_fl, P_0fr, P_0br])
+            front_left_support_triangle         = self.MotionPlanner.get_support_polygon_from_points([P_0bl, P_0fr, P_0br], name="front left ST")
+            back_left_support_triangle          = self.MotionPlanner.get_support_polygon_from_points([B_fl, P_0fr, P_0br], name="back left ST")
+            f_l_end_affector_range_circle       = self.MotionPlanner.get_end_affector_circle_from_xyz_r(P_0fl, end_affector_movement_radius, name="front left range")
+            b_l_end_affector_range_circle       = self.MotionPlanner.get_end_affector_circle_from_xyz_r(P_0bl, end_affector_movement_radius, name="back left range")
+
+            polys = [front_left_support_triangle, back_left_support_triangle, f_l_end_affector_range_circle, b_l_end_affector_range_circle]
+
+            back_left_support_triangle.visualize()
+            front_left_support_triangle.visualize()
+            b_l_end_affector_range_circle.visualize()
+            f_l_end_affector_range_circle.visualize()
 
             # Shift torso to Pt
-            Pt = self.MotionPlanner.get_centroid_of_support_polygon_intersection( front_left_support_triangle, back_left_support_triangle)
+            Pt = self.MotionPlanner.get_centroid_from_multiple_poly_intersections(polys)
             Pt = [Pt[0],Pt[1], curr_torso_z]
 
             vis.add("Pt", Pt)
@@ -510,7 +524,9 @@ class HighLevelMotionController(object):
             # --- right legs
 
             front_right_support_triangle = self.MotionPlanner.get_support_polygon_from_points([B_fl, B_bl, B_fr])
+
             back_right_support_triangle = self.MotionPlanner.get_support_polygon_from_points([B_fl, B_bl, P_0fr])
+
 
             Pt2 = self.MotionPlanner.get_centroid_of_support_polygon_intersection(front_right_support_triangle, back_right_support_triangle )
             Pt2 = [Pt2[0],Pt2[1], curr_torso_z]

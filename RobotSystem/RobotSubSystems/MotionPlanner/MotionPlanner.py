@@ -6,13 +6,14 @@ from klampt import vis
 
 class MotionPlanner():
 
-    def __init__(self,robot,RobotUtils, Vector, SupportPolygon):
+    def __init__(self,robot,RobotUtils, Vector, SupportPolygon, _2DLegRadius):
 
         self.robosimian = robot
         self.RobotUtils = RobotUtils
 
         self.Vector = Vector
         self._2DSupportPolygon = SupportPolygon
+        self._2DLegRadius = _2DLegRadius
 
         self.f_r_end_affector = self.robosimian.link(self.RobotUtils.f_r_active_dofs[len(self.RobotUtils.f_r_active_dofs) - 1])
         self.f_l_end_affector = self.robosimian.link(self.RobotUtils.f_l_active_dofs[len(self.RobotUtils.f_l_active_dofs) - 1])
@@ -128,7 +129,7 @@ class MotionPlanner():
         return support_tri
 
 
-    def get_support_polygon_from_points(self, P):
+    def get_support_polygon_from_points(self, P, name=None):
 
         '''
         @summary returns a _2DSupportPolygon created by the parameterized array of Points
@@ -136,7 +137,7 @@ class MotionPlanner():
         @return: _2DSupportPolygon object
         '''
 
-        return self._2DSupportPolygon(P)
+        return self._2DSupportPolygon(P, name=name)
 
     def point_is_in_support_polygon_intersection(self, support_poly1, support_poly2, P):
 
@@ -149,6 +150,32 @@ class MotionPlanner():
         '''
 
         return support_poly1.support_poly_is_in_intersection_with_other_2d_support_poly(support_poly2, P)
+
+
+    def get_end_affector_circle_from_xyz_r(self, xyz, r, name=None):
+
+        '''
+        @summary returns a _2DLegRadius object with the specified x,y and r
+        @param xyz: [x,y,z] list containing centerpoint of the _2DLegRadius object
+        @param r: radius of circle
+        @return: _2DLegRadius object
+        '''
+
+        return self._2DLegRadius(xyz, r, name=name)
+
+
+    def get_centroid_from_multiple_poly_intersections(self, _2Dgeometryobjects):
+
+        if len(_2Dgeometryobjects) < 2:
+            self.RobotUtils.ColorPrinter((self.__class__.__name__ + ".get_centroid_from_multiple_poly_intersections()"),
+                                         "Error: _2Dgeometryobjects has less than two objects", "FAIL")
+            return False
+
+        first_obj = _2Dgeometryobjects[0]
+        rest = _2Dgeometryobjects[1:]
+
+        return first_obj.xy_centroid_from_list_of_2DGeometry_objects(rest)
+
 
 
     def get_centroid_of_support_polygon_intersection(self, support_poly1, support_poly2):

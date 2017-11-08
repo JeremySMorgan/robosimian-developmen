@@ -74,6 +74,8 @@ class RobotUtils(object):
     BASE_STATE_X_DELTA                  = .30
     BASE_STATE_Y_DELTA                  = BASE_STATE_X_DELTA
     BASE_STATE_Z_DELTA                  = -.55
+    LEG_LENGTH                          = .766
+    END_AFFECTOR_RADIUS                 = math.sqrt(LEG_LENGTH**2 - BASE_STATE_Z_DELTA**2)
 
     # Reset Constants
     MINIMUM_DIST_TO_CAUSE_RESET         = .05
@@ -107,9 +109,9 @@ class RobotUtils(object):
     else:
         INITIALIZATION_STEP_TIME            = .5
         RESET_LEG_STEP_TIME                 = 4
-        TURN_TIME                           = 1.5
-        TORSO_SHIFT_TIME                    = 3
-        STEP_TIME                           = 1.5
+        TURN_TIME                           = 2
+        TORSO_SHIFT_TIME                    = 2
+        STEP_TIME                           = 1
         TORSO_YAW_ROTATE_TIME               = 1.5
 
 

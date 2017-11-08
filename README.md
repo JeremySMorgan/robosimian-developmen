@@ -59,3 +59,7 @@ else:
 
 - `measured_controller_dt` Aproximates the true control loop delay time. This variable is used in all of the Threaded Moiton in Speficied Time APIS. Note that because of this the TURN/STEP/ect_TIME constants in *RobotUtils* are used as estimates for the total step time. 
 
+
+### Constants
+
+- `LEG_LENGTH` is the length of a fully extended and straight leg, measured from the vertically rotating shoulder joint to the end affector. Experimentally found to be ~ .766 m
