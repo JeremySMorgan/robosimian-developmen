@@ -3,14 +3,8 @@
 import sys
 import time
 
-import numpy as np
-
-from Utilities._2D_GeometryObjects._2DLegRadius import _2DLegRadius
-from Utilities._2D_GeometryObjects._2DSupportPolygon import _2DSupportPolygon
-
 from klampt import *
 from klampt.model import coordinates
-from klampt.model import trajectory
 
 from RobotSubSystems.MotionController.HighLevelMotionController import HighLevelMotionController
 from RobotSubSystems.MotionPlanner.MotionPlanner import MotionPlanner
@@ -18,11 +12,10 @@ from RobotSubSystems.ObjectiveManager.ObjectiveManager import ObjectiveManager
 from RobotSubSystems.StabilityManager.StabilityManager import StabilityManager
 from RobotSubSystems.UserInput.UserInput import UserInput
 from Utilities.RobotUtils.RobotUtils import RobotUtils
-from Utilities.Vector.Vector import Vector
+from Utilities.RobotInspector.RobotInspector import RobotInspector
 
 if RobotUtils.SIMULATION_ENABLED:
     from klampt import vis
-
 
 
 
@@ -32,7 +25,7 @@ class Hypervisor():
 
         self.robot_file = robot_file
         self.world_file = world_file
-        self.robosimian = None
+        self.planning_world_robosimian = None
         self.world = None
         self.MotionController = None
         self.MotionPlanner = None
@@ -41,70 +34,71 @@ class Hypervisor():
 
     def start(self):
 
-        world = WorldModel()
+        sim_world = WorldModel()
 
-        res = world.readFile(self.robot_file)
+        res = sim_world.readFile(self.robot_file)
         if not res:
             raise RuntimeError("Unable to load model")
 
         if RobotUtils.INCLUDE_TERRAIN:
-            terrain = world.readFile(self.world_file)
+            terrain = sim_world.readFile(self.world_file)
             if not terrain:
                 raise RuntimeError("Unable to load plane")
 
+        self.planning_world = sim_world.copy()
+        self.planning_world_robosimian = self.planning_world.robot(0)
+        self.sim_world_roboosimian = sim_world.robot(0)
 
-        self.planning_world = world.copy()
+        # Set initial configurations. Note that this is may not be the base state, but it will be close to it.
+        starting_config  = RobotUtils.STARTING_CONFIG
+        self.sim_world_roboosimian.setConfig(starting_config)
+        self.planning_world_robosimian.setConfig(starting_config)
 
+        # Initialize visualization
         if RobotUtils.PHYSICS_ENABLED:
-            self.initialize_visualization(world)
+            self.initialize_visualization(sim_world)
         else:
             self.initialize_visualization(self.planning_world)
 
-        self.robosimian = self.planning_world.robot(0)
-        self.sim =  Simulator(world)
+        # initialize simulation
+        self.sim =  Simulator(sim_world)
         self.sim.setGravity([0,0,0])
 
         # Create robot controller
         self.controller = self.sim.controller(0)
         self.controller.setRate(RobotUtils.CONTROLLER_DT)
 
-        self.StabilityManager = StabilityManager(world, self.sim, RobotUtils)
-
-        # Create HighLevelMotionController
-        self.HighLevelMotionController = HighLevelMotionController(self.robosimian, RobotUtils, self.controller)
-
-        # Create HighLevelMotionController
-        self.MotionPlanner = MotionPlanner(self.robosimian, RobotUtils, Vector, _2DSupportPolygon, _2DLegRadius)
-
-        # Pass the Motion Controller the MotionPlanner
+        # Initilialize RobotSubsystems
+        self.StabilityManager = StabilityManager(sim_world, self.sim, RobotUtils)
+        self.HighLevelMotionController = HighLevelMotionController(self.planning_world_robosimian, self.controller)
+        self.MotionPlanner = MotionPlanner(self.planning_world_robosimian)
         self.HighLevelMotionController.initialize_motion_planner(self.MotionPlanner)
 
-        # User Input
-        self.UserInput = UserInput(RobotUtils)
-
-        # Objective Manager
+        # Initialize Utility Classes
+        self.UserInput = UserInput()
         self.ObjectiveManager = ObjectiveManager(RobotUtils, self.MotionPlanner, self.HighLevelMotionController, self.UserInput )
+        self.PlanningWorldRobotInspector = RobotInspector(self.planning_world_robosimian, RobotUtils, self.MotionPlanner)
+        self.SimWorldRobotInspector = RobotInspector(self.planning_world_robosimian, RobotUtils, self.MotionPlanner)
+
+        self.PlanningWorldRobotInspector.add_line_to_vis(" --- X --- ", [1, 0, 0], [0, 0, 0])
+        self.PlanningWorldRobotInspector.add_line_to_vis(" --- Y --- ", [0, 1, 0], [0, 0, 0])
 
         RobotUtils.ColorPrinter(self.__class__.__name__,"Hypervisor initialization finished","OKBLUE")
 
-        running = True
+        self.UserInput.start()
+        self.ObjectiveManager.start_objective_management_loop()
 
-        try:
+        '''
+        while not self.HighLevelMotionController.initialization_complete:
+            time.sleep(.05)
+            print "waiting for initialization"
 
-            if running:
-                if not RobotUtils.PHYSICS_ENABLED:
+        self.PlanningWorldRobotInspector.shift_x(amount=1)
+        self.PlanningWorldRobotInspector.shift_y(amount=2)
+        self.PlanningWorldRobotInspector.rotate_yaw(degree=-45)
+        '''
 
-                    # TODO: set_initial_config() called twice.
-
-                    self.HighLevelMotionController.set_inital_config()
-                    self.MotionPlanner.save_base_states()
-
-                self.UserInput.start()
-                self.ObjectiveManager.start_objective_management_loop()
-                self.run_visualization()
-
-        except KeyboardInterrupt:
-            self.shutdown()
+        self.run_visualization()
 
 
     def shutdown(self):
@@ -134,6 +128,8 @@ class Hypervisor():
             # Update model
             vis.lock()
 
+            self.PlanningWorldRobotInspector.update_torso_COM()
+
             if RobotUtils.PHYSICS_ENABLED:
 
                 if self.gravity_paused:
@@ -152,58 +148,3 @@ class Hypervisor():
             time.sleep(RobotUtils.CONTROLLER_DT)
             if not vis.shown():
                 sys.exit()
-
-
-
-    def vis_test(self):
-
-        name = "test"
-        obj = [1,1,1]
-
-        traj_name = "test circle"
-        circle = self.get_trajectory_circle([.5,.5,.5],.5)
-
-        vis.add(traj_name, circle)
-
-        vis.add(name, obj)
-
-
-    def get_trajectory_circle(self, xyz, r ):
-
-        x0 = xyz[0]
-        y0 = xyz[1]
-        z0 = xyz[2]
-
-        milestones = []
-
-        for i in range(361):
-
-            x = x0 + np.cos(np.radians(i))
-            y = y0 + np.sin(np.radians(i))
-
-            milestones.append([x,y,z0])
-
-        return trajectory.Trajectory(milestones=milestones)
-
-
-
-
-    def get_leg_length(self):
-
-        q = self.robosimian.getConfig()
-        q[7] = (3.141592 / 2.0)
-        q[9] = (3.141592)
-        q[11] = (3.141592)
-        self.robosimian.setConfig(q)
-
-        shoulder_xyz = self.robosimian.link(7).getWorldPosition([0, 0, 0])
-        end_aff_xyz = self.robosimian.link(13).getWorldPosition([0, 0, 0])
-
-        vis.add("shoulder", shoulder_xyz)
-        vis.add("end aff", end_aff_xyz)
-
-        d_y = end_aff_xyz[1] - shoulder_xyz[1]
-
-        print "Shoulder xyz:", shoulder_xyz
-        print "end_aff_xyz:", end_aff_xyz
-        print "dy: ", d_y

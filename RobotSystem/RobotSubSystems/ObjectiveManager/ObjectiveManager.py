@@ -1,6 +1,5 @@
 import threading
 import time
-
 from ...Utilities.MotionThread.MotionThread import MotionThread
 
 class ObjectiveManager(object):

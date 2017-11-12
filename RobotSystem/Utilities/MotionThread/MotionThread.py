@@ -24,7 +24,7 @@ class MotionThread(object):
 
         # dont pass any arguments
         else:
-            print "MotionThread: starting thread with no args. name:",self.thread_name
+            #print "MotionThread: starting thread with no args. name:",self.thread_name
             self.thread = threading.Thread(target=self.function_name, name=self.thread_name)
 
         self.thread.__setattr__(MotionThread.keep_alive_word, True)

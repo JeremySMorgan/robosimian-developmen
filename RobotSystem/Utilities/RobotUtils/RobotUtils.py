@@ -1,6 +1,7 @@
 from __future__ import print_function
 import math
 import datetime
+import numpy as np
 
 class RobotUtils(object):
 
@@ -37,17 +38,12 @@ class RobotUtils(object):
     B_R_FOOT = "B_R_FOOT"
     B_L_FOOT = "B_L_FOOT"
 
-    LEG_BASE_STATE = "BASE_STATE"
-    LEG_F_EXTEND_STATE = "LEG_F_EXTEND"
-    LEG_B_EXTEND_STATE = "LEG_B_EXTEND"
-
     robot_states = [FORWARD, BACKWARD, LEFT, RIGHT]
     robot_turning_States = [LEFT, RIGHT]
 
-    left_feet = [F_L_FOOT, B_L_FOOT]
-    right_feet = [F_R_FOOT, B_R_FOOT]
+    left_feet     = [F_L_FOOT, B_L_FOOT ]
+    right_feet    = [F_R_FOOT, B_R_FOOT ]
     end_affectors = [F_R_FOOT, F_L_FOOT, B_R_FOOT, B_L_FOOT]
-    leg_states = [ LEG_B_EXTEND_STATE, LEG_BASE_STATE, LEG_F_EXTEND_STATE]
 
     # App wide multithreading constants
     KEEP_THREAD_ALIVE                   = "thread_is_alive"
@@ -66,35 +62,52 @@ class RobotUtils(object):
     OBJECTIVE_PLANNER_UPDATE_DELAY      = .05
 
     # Global IK constants
-    IK_MAX_DEVIATION                    = .715
+    IK_MAX_DEVIATION                    = .615
 
-    # End Affector Base State Position
-    SHOULDER_X                          = .209067915157
-    SHOULDER_Y                          = .206456211
-    BASE_STATE_X_DELTA                  = .30
+    # Base State Parameters
+    STARTING_CONFIG                     = [ 0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.05424, 0.66479, 0.07701, -1.79261, -0.13906, -0.44839, 0.12875, 0.00000, 0.08129, -0.72312, -0.03797, 2.07474, 0.12972, 0.22139, -0.22298, 0.00000, -0.07511, 0.72165, 0.03403, -2.07091, -0.11534, -0.22331, 0.21007, 0.00000, 0.08189, -0.70402, -0.03012, 2.07355, 0.11415, 0.20279, -0.21321]
+    BASE_STATE_X_DELTA                  = .32
     BASE_STATE_Y_DELTA                  = BASE_STATE_X_DELTA
-    BASE_STATE_Z_DELTA                  = -.55
-    LEG_LENGTH                          = .766
-    END_AFFECTOR_RADIUS                 = math.sqrt(LEG_LENGTH**2 - BASE_STATE_Z_DELTA**2)
+    BASE_STATE_Z_DELTA                  = -.5 # This value is the delta z from the torso to the ground (/end affectors center point)
+
+    # Robot Measurements
+    SHOULDER_X                          = .293260631869
+    SHOULDER_Y                          = .206456211
+    SHOULDER_Z                          = -0.2085299999988
+    LEG_LENGTH                          = .775
+    SHOULDER_TORSO_XY_EUCLIDEAN_DIF     = 0.3603472707
+    DELTA_Z_SHOULDER_END_AFFECTOR       = 0.980182 * (BASE_STATE_Z_DELTA) + .20965
+    END_AFFECTOR_RADIUS_TO_SHOULDER     = math.sqrt(LEG_LENGTH**2 - DELTA_Z_SHOULDER_END_AFFECTOR**2)
+    SHOULDER_TORSO_PSI_RADS             = .620089205322
+    FORWARD_BACK_LEGS_EUCLIDEAN_DIST    = 2 * (SHOULDER_X + BASE_STATE_X_DELTA)
+    LEFT_RIGHT_LEGS_EUCLIDEAN_DIST      = 2 * (SHOULDER_Y + BASE_STATE_Y_DELTA)
+
+    # Visualization - determines if _2DSupport Objects are shown
+    RESET_VISUALIZATION_ENABLED         = True
+    FORWARD_STEP_VISUALIZATION_ENABLED  = True
 
     # Reset Constants
-    MINIMUM_DIST_TO_CAUSE_RESET         = .05
-    MINIMUM_X_DELTA                     = .01
-    MINIMUM_Y_DELTA                     = .01
-    MINIMUM_Z_DELTA                     = .01
+    MINIMUM_DIST_TO_CAUSE_RESET         = .001
+    MINIMUM_X_DELTA                     = .05
+    MINIMUM_Y_DELTA                     = .05
+    MINIMUM_Z_DELTA                     = .015      # all z deltas above this will trigger a reset
+    MAX_ALLOWABLE_END_EFFECTR_ANGLE_ERR       = .5
+    MAX_ALLOWABLE_LR_ERR                = .01
+    MAX_ALLOWABLE_FB_ERR                = .025
 
     # Turn Constants
     TORSO_YAW_ROTATE_ANGLE              = 15
+    TURNING_MIDSTEP_SLEEP_T             = .5
 
     # Step Constants
-    STEP_X_DELTA                        = .15
     STEP_Z_MAX_HIEGHT                   = .05
-    TORSO_SHIFT_DELTA                   = STEP_X_DELTA
+
+    TORSO_SHIFT_DELTA                   = .1                            # TODO: This should be optimized or calculated.
     TORSO_LEFT_SHIFT                    = BASE_STATE_X_DELTA / 2.5
 
     # Simulation constants
     SIMULATION_ENABLED                  = True
-    PHYSICS_ENABLED                     = False
+    PHYSICS_ENABLED                     = True
     INCLUDE_TERRAIN                     = True
 
     # Movement timing constants
@@ -108,15 +121,16 @@ class RobotUtils(object):
 
     else:
         INITIALIZATION_STEP_TIME            = .5
-        RESET_LEG_STEP_TIME                 = 4
-        TURN_TIME                           = 2
-        TORSO_SHIFT_TIME                    = 2
-        STEP_TIME                           = 1
+        RESET_LEG_STEP_TIME                 = 1
+        TURN_TIME                           = 1
+        TORSO_SHIFT_TIME                    = 1
+        STEP_TIME                           = .5
         TORSO_YAW_ROTATE_TIME               = 1.5
 
 
     @staticmethod
     def ColorPrinter( caller, message, color):
+
         # [03/Apr/2017 18:37:10]
         time = datetime.datetime.now()
 
@@ -126,7 +140,25 @@ class RobotUtils(object):
         prefix = "["+str(time.day)+"/"+str(time.month)+ "/" + str(time.year) + " " + str(time.hour) + ":" + str(time.minute) + ":" + str(time.second) +  " ] "
         prefix = prefix +  RobotUtils.COLORS["BOLD"]["value"]+ RobotUtils.COLORS["UNDERLINE"]["value"]+ caller+ RobotUtils.COLORS["ENDC"]["value"]+ ":"
         print_Str = prefix + " "+RobotUtils.COLORS[color]["value"] + " "+message + " "+RobotUtils.COLORS["ENDC"]["value"]
+
         print(print_Str)
+
+
+    @staticmethod
+    def angle_between_three_points(p1, p2, p3):
+
+        # see https://stackoverflow.com/questions/35176451/python-code-to-calcualte-angle-between-three-point-using-thier-3d-coordinates
+
+        a = np.array(p1)
+        b = np.array(p2)
+        c = np.array(p3)
+
+        ba = a - b
+        bc = c - b
+
+        cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
+
+        return np.degrees(np.arccos(cosine_angle))
 
 
     @staticmethod
@@ -138,13 +170,22 @@ class RobotUtils(object):
 
         return math.sqrt( d_x +d_y  +d_z    )
 
-
     @staticmethod
     def always_true_func():
         return True
 
     @staticmethod
+    def pp_list(list):
+        ret = "[ "
+        for i in list:
+            ret += "%.5f" % i
+            ret += ", "
+        ret = ret[:-2]
+        ret += "] "
+        return ret
+
+    @staticmethod
     def pp_double(dbl):
-        s = "%.3f" % dbl
+        s = "%.4f" % dbl
         return s
 

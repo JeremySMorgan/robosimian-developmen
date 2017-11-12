@@ -46,10 +46,27 @@ class _2DSupportPolygon(object):
         return self.shapely_poly
 
 
+    def point_is_inside_list_of_2DGeometry_objects(self, point_xyz, o_2D_objects):
+
+        intersection = self.get_shapely_intersection_from_2DGeometry_objects(o_2D_objects)
+        point = Point(point_xyz[0],point_xyz[1])
+
+        return intersection.contains(point)
+
+
+
+    def get_shapely_intersection_from_2DGeometry_objects(self, o_2DGeometry_objs):
+
+        obj = self.shapely_poly
+        o_objs = []
+        for i in o_2DGeometry_objs:
+            o_objs.append(i.shapely_poly)
+        intersection = _2DSupportPolygon.get_intersection(obj, o_objs)
+
+        return intersection
 
 
     def xy_centroid_from_list_of_2DGeometry_objects(self, o_2DGeometry_objs):
-
 
         '''
         @summary returns the centroid of the intersection area of numrerous _2D_xxx support ibjects
@@ -57,36 +74,31 @@ class _2DSupportPolygon(object):
         @return:
         '''
 
+        intersection = self.get_shapely_intersection_from_2DGeometry_objects(o_2DGeometry_objs)
+        intersection_centroid = intersection.centroid.coords
+        x = intersection_centroid.xy[0][0]
+        y = intersection_centroid.xy[1][0]
 
-        obj = self.shapely_poly
-        o_objs = []
-        for i in o_2DGeometry_objs:
-            o_objs.append(i.shapely_poly)
-
-
-        intersection = _2DSupportPolygon.get_intersection(obj, o_objs)
-        xy = intersection.xy
-        print "xy:",xy
-        print "intersection:",intersection
+        return [x,y]
 
 
+
+    def point_is_inside_intersection_of_multiple_2DGeometry_objects(self, point_xyz, o_2D_objects):
+
+        intersection = self.get_shapely_intersection_from_2DGeometry_objects(o_2D_objects)
+        point = Point(point_xyz[0], point_xyz[1])
+
+        return intersection.contains(point)
 
 
     @staticmethod
     def get_intersection(obj, o_objects):
 
         ret = obj.intersection(o_objects[0])
-        print "ret:",ret
-
         if len(o_objects) >= 2:
             for o_obj in o_objects:
-                print "o_obj:",o_obj
                 ret = ret.intersection(o_obj)
-                print "ret:", ret
-
         return ret
-
-
 
 
     def support_poly_is_in_intersection_with_other_2d_support_poly(self, o__2DSupportPolygon, P):
@@ -115,6 +127,9 @@ class _2DSupportPolygon(object):
         return intersection_poly.centroid.coords[0]
 
 
+    def remove_visualization(self):
+        vis.remove(self.name)
+
 
     def visualize(self):
 
@@ -127,11 +142,9 @@ class _2DSupportPolygon(object):
 
         circle = trajectory.Trajectory(milestones=milestones)
         if not self.name:
-            name = "supoprt polygon " + str(random.randint(1,1000))
-        else:
-            name = self.name
+            self.name = "supoprt polygon " + str(random.randint(1,1000))
 
-        vis.add(name, circle)
+        vis.add(self.name, circle)
 
 
     def plot_poly(self, poly, z, name=None):

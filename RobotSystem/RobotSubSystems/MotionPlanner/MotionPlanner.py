@@ -2,64 +2,159 @@
 import math
 from klampt.math import so3
 from klampt import vis
-
+from klampt.model import trajectory
+import numpy as np
+from ...Utilities.RobotUtils.RobotUtils import RobotUtils
+from ...Utilities._2D_GeometryObjects._2DLegRadius import _2DLegRadius
+from ...Utilities._2D_GeometryObjects._2DSupportPolygon import _2DSupportPolygon
+from ...Utilities.Vector.Vector import Vector
 
 class MotionPlanner():
 
-    def __init__(self,robot,RobotUtils, Vector, SupportPolygon, _2DLegRadius):
+    def __init__(self, robot):
 
         self.robosimian = robot
-        self.RobotUtils = RobotUtils
 
-        self.Vector = Vector
-        self._2DSupportPolygon = SupportPolygon
-        self._2DLegRadius = _2DLegRadius
+        self.f_r_end_affector = self.robosimian.link(RobotUtils.f_r_active_dofs[len(RobotUtils.f_r_active_dofs) - 1])
+        self.f_l_end_affector = self.robosimian.link(RobotUtils.f_l_active_dofs[len(RobotUtils.f_l_active_dofs) - 1])
+        self.b_r_end_affector = self.robosimian.link(RobotUtils.b_r_active_dofs[len(RobotUtils.b_r_active_dofs) - 1])
+        self.b_l_end_affector = self.robosimian.link(RobotUtils.b_l_active_dofs[len(RobotUtils.b_l_active_dofs) - 1])
 
-        self.f_r_end_affector = self.robosimian.link(self.RobotUtils.f_r_active_dofs[len(self.RobotUtils.f_r_active_dofs) - 1])
-        self.f_l_end_affector = self.robosimian.link(self.RobotUtils.f_l_active_dofs[len(self.RobotUtils.f_l_active_dofs) - 1])
-        self.b_r_end_affector = self.robosimian.link(self.RobotUtils.b_r_active_dofs[len(self.RobotUtils.b_r_active_dofs) - 1])
-        self.b_l_end_affector = self.robosimian.link(self.RobotUtils.b_l_active_dofs[len(self.RobotUtils.b_l_active_dofs) - 1])
+        # initialized in save_base_states(). Used by legs_make_base_state()
+        # [F_R_FOOT, F_L_FOOT, B_R_FOOT, B_L_FOOT]
+        self.base_state_angles = None
 
-    # TODO: Figure out why this needs to be worldPosition, not localPosition as would be expected
+
     def save_base_states(self):
 
-        self.local_f_r_end_affector_base_state = self.f_r_end_affector.getWorldPosition([0, 0, 0])
-        self.local_f_l_end_affector_base_state = self.f_l_end_affector.getWorldPosition([0, 0, 0])
-        self.local_b_r_end_affector_base_state = self.b_r_end_affector.getWorldPosition([0, 0, 0])
-        self.local_b_l_end_affector_base_state = self.b_l_end_affector.getWorldPosition([0, 0, 0])
+        '''
+        @summary: This function saves the world positions of the end affectors. Note that the robot needs to be at the origin
+                    or the end affectors will be saved to an incorrect location.
+        @return: None
+        '''
+
+        print "SAVE BASE STATES CALLED"
+
+        bl = self.b_l_end_affector.getWorldPosition([0, 0, 0])
+        br = self.b_r_end_affector.getWorldPosition([0, 0, 0])
+        fl = self.f_l_end_affector.getWorldPosition([0, 0, 0])
+        fr = self.f_r_end_affector.getWorldPosition([0, 0, 0])
+
+
+        self.local_f_r_end_affector_base_state = fr
+        self.local_f_l_end_affector_base_state = fl
+        self.local_b_r_end_affector_base_state = br
+        self.local_b_l_end_affector_base_state = bl
+
+        self.br_base_angle_deg = (RobotUtils.angle_between_three_points(bl, br, fr) % 360)
+        self.fl_base_angle_deg = (RobotUtils.angle_between_three_points(fr, fl, bl) % 360)
+        self.bl_base_angle_deg = (RobotUtils.angle_between_three_points(fl, bl, br) % 360)
+        self.fr_base_angle_deg = (RobotUtils.angle_between_three_points(br, fr, fl) % 360)
+
+
+        #print "br base state angle:",self.br_base_angle_deg
+        #print "fl base state angle:",self.fl_base_angle_deg
+        #print "bl base state angle:",self.bl_base_angle_deg
+        #print "fr base state angle:",self.fr_base_angle_deg
+
+
+        self.base_state_angles = [self.fr_base_angle_deg, self.fl_base_angle_deg, self.br_base_angle_deg, self.bl_base_angle_deg]
 
 
     def legs_make_base_state(self):
 
         '''
         @summary: This function returns true if the legs CAN compose a base state, that is that the robot could enter a
-                    base state by only moving the torso
+                    base state by only moving the torso. This is done as following:
+                        checking to see that
+                            1) the angles formed by the angles defined by (fl, bl, br) and (br,fr,fl) legs are both 90
+                            2) the distance between back legs equals RobotUtils.LEFT_RIGHT_LEGS_EUCLIDEAN_DIST
+                            3) the distance between back and front legs equals RobotUtils.FORWARD_BACK_LEGS_EUCLIDEAN_DIST
+
         @return: boolean
         '''
+
+        default_left_right_dist = RobotUtils.LEFT_RIGHT_LEGS_EUCLIDEAN_DIST
+        default_front_back_dist = RobotUtils.FORWARD_BACK_LEGS_EUCLIDEAN_DIST
 
         f_l_curr = self.f_l_end_affector.getWorldPosition([0, 0, 0])
         f_r_curr = self.f_r_end_affector.getWorldPosition([0, 0, 0])
         b_l_curr = self.b_l_end_affector.getWorldPosition([0, 0, 0])
         b_r_curr = self.b_r_end_affector.getWorldPosition([0, 0, 0])
 
-        f_l_base = self.local_f_l_end_affector_base_state
-        f_r_base = self.local_f_r_end_affector_base_state
-        b_l_base = self.local_b_l_end_affector_base_state
-        b_r_base = self.local_b_r_end_affector_base_state
+        br_angle_deg = (RobotUtils.angle_between_three_points(b_l_curr, b_r_curr, f_r_curr) % 360)
+        fl_angle_deg = (RobotUtils.angle_between_three_points(f_r_curr, f_l_curr, b_l_curr) % 360)
+        bl_angle_deg = (RobotUtils.angle_between_three_points(f_l_curr, b_l_curr, b_r_curr) % 360)
+        fr_angle_deg = (RobotUtils.angle_between_three_points(b_r_curr, f_r_curr, f_l_curr) % 360)
 
-        f_l_vector = self.Vector( [ (f_l_base[0] - f_l_curr[0]), (f_l_base[1] - f_l_curr[1]), (f_l_base[2] - f_l_curr[2])  ])
-        f_r_vector = self.Vector( [ (f_r_base[0] - f_r_curr[0]), (f_r_base[1] - f_r_curr[1]), (f_r_base[2] - f_r_curr[2])  ])
-        b_l_vector = self.Vector( [ (b_l_base[0] - b_l_curr[0]), (b_l_base[1] - b_l_curr[1]), (b_l_base[2] - b_l_curr[2])  ])
-        b_r_vector = self.Vector( [ (b_r_base[0] - b_r_curr[0]), (b_r_base[1] - b_r_curr[1]), (b_r_base[2] - b_r_curr[2])  ])
+        if np.fabs(br_angle_deg - self.br_base_angle_deg) > RobotUtils.MAX_ALLOWABLE_END_EFFECTR_ANGLE_ERR:
+            #print "Error: br angle not in base angle:", br_angle_deg
+            return False
 
-        if f_l_vector.multiple_vector_directions_are_equal([f_r_vector, b_l_vector, b_r_vector]):
-            if f_r_vector.multiple_vector_directions_are_equal([b_l_vector, b_r_vector]):
-                if b_l_vector.multiple_vector_directions_are_equal([b_r_vector]):
-                    return True
-        return False
+        if np.fabs(fl_angle_deg - self.fl_base_angle_deg) > RobotUtils.MAX_ALLOWABLE_END_EFFECTR_ANGLE_ERR:
+            #print "Error: fl angle not in base angle:", fl_angle_deg
+            return False
+
+        if np.fabs(bl_angle_deg - self.bl_base_angle_deg) > RobotUtils.MAX_ALLOWABLE_END_EFFECTR_ANGLE_ERR:
+            #print "Error: bl angle not in base angle:", bl_angle_deg
+            return False
+
+        if np.fabs(fr_angle_deg - self.fr_base_angle_deg) > RobotUtils.MAX_ALLOWABLE_END_EFFECTR_ANGLE_ERR:
+            #print "Error: fr angle not in base angle:", fr_angle_deg
+            return False
+
+        #print "br angle:",br_angle_deg
+        #print "fl angle:",fl_angle_deg
+        #print "bl angle:",bl_angle_deg
+        #print "fr angle:",fr_angle_deg
+
+        left_side_fb_dist = RobotUtils.get_euclidian_diff(f_l_curr, b_l_curr)
+        right_side_fb_dist = RobotUtils.get_euclidian_diff(f_r_curr, b_r_curr)
+
+        front_lr_dist = RobotUtils.get_euclidian_diff(f_l_curr, f_r_curr)
+        back_lr_dist = RobotUtils.get_euclidian_diff(b_l_curr, b_r_curr)
+
+        #print " left_side_fb_dist:",left_side_fb_dist
+        #print " right_side_fb_dist:",right_side_fb_dist
+        #print " front_lr_dist:",front_lr_dist
+        #print " back_lr_dist:",back_lr_dist
+
+        if np.fabs(left_side_fb_dist - right_side_fb_dist) > .01:
+            #print "Error: left_side_fb_dist and right_side_fb_dist do not equal. error:", np.fabs(left_side_fb_dist - right_side_fb_dist)
+            return False
+
+        if np.fabs(front_lr_dist - back_lr_dist) > .01:
+            #print "Error: left_side_fb_dist  and ight_side_fb_dist are not equal. error:", np.fabs(left_side_fb_dist - right_side_fb_dist)
+            return False
+
+        lr_error = np.fabs(back_lr_dist - default_left_right_dist)
+        if lr_error > RobotUtils.MAX_ALLOWABLE_LR_ERR:
+            #print "error: left right error> MAX_ALLOWABLE_LR_ERR. error, max error:",lr_error, RobotUtils.MAX_ALLOWABLE_LR_ERR
+            return False
 
 
+        # Measured front back difference : 1.1181
+        # Measured left right difference : 1.1129
 
+
+        #print "\ndefault LEFT RIGHT distance:",default_left_right_dist
+        #print "current LEFT RIGHT distance:",back_lr_dist,"\n"
+        #print "default FRONT BACK distance:",default_front_back_dist
+        #print "current FRONT BACK distance:",right_side_fb_dist
+
+        fb_error = np.fabs(left_side_fb_dist - default_front_back_dist)
+        if fb_error > RobotUtils.MAX_ALLOWABLE_FB_ERR:
+            #print "\nerror when comparing left sides front back distance."
+            #print "front back distance: ",left_side_fb_dist
+            #print "default FRONT BACK distance:",default_front_back_dist
+            #print "Error: ",fb_error
+            #print "max allowable error:",RobotUtils.MAX_ALLOWABLE_FB_ERR,"\n"
+            return False
+
+        return True
+
+
+    # TODO: This function likely has bugs. Need to test when the robot is rotated
     def three_legs_make_base_state(self):
 
         '''
@@ -68,6 +163,10 @@ class MotionPlanner():
         @return: end affector name of fourth leg that can be moved to make the legs into a base state (definied in RobotUtils)
         '''
 
+        torso_yaw_rad =  self.get_current_torso_yaw_rads()
+        yaw_rotation_aa = ([0, 0, 1], torso_yaw_rad)
+        yaw_rotation_R = so3.from_axis_angle(yaw_rotation_aa)
+
         f_l_curr = self.f_l_end_affector.getWorldPosition([0, 0, 0])
         f_r_curr = self.f_r_end_affector.getWorldPosition([0, 0, 0])
         b_l_curr = self.b_l_end_affector.getWorldPosition([0, 0, 0])
@@ -78,27 +177,53 @@ class MotionPlanner():
         b_l_base = self.local_b_l_end_affector_base_state
         b_r_base = self.local_b_r_end_affector_base_state
 
+        f_l_base_rotated = so3.apply(yaw_rotation_R, f_l_base)
+        f_r_base_rotated = so3.apply(yaw_rotation_R, f_r_base)
+        b_l_base_rotated = so3.apply(yaw_rotation_R, b_l_base)
+        b_r_base_rotated = so3.apply(yaw_rotation_R, b_r_base)
 
-        f_l_vector = self.Vector( [ (f_l_base[0] - f_l_curr[0]), (f_l_base[1] - f_l_curr[1]), (f_l_base[2] - f_l_curr[2])  ])
-        f_r_vector = self.Vector( [ (f_r_base[0] - f_r_curr[0]), (f_r_base[1] - f_r_curr[1]), (f_r_base[2] - f_r_curr[2])  ])
-        b_l_vector = self.Vector( [ (b_l_base[0] - b_l_curr[0]), (b_l_base[1] - b_l_curr[1]), (b_l_base[2] - b_l_curr[2])  ])
-        b_r_vector = self.Vector( [ (b_r_base[0] - b_r_curr[0]), (b_r_base[1] - b_r_curr[1]), (b_r_base[2] - b_r_curr[2])  ])
+        #print "fl curr:",f_l_curr
+        #print "fr curr:",f_r_curr
+        #print "bl curr:",b_l_curr
+        #print "br curr:",b_r_curr
+
+        #print "fl base:",f_l_base
+        #print "fr base:",f_r_base
+        #print "bl base:",b_l_base
+        #print "br base:",b_r_base
+
+
+        f_l_vector = Vector( [ (f_l_base_rotated[0] - f_l_curr[0]), (f_l_base_rotated[1] - f_l_curr[1]), (f_l_base_rotated[2] - f_l_curr[2])  ])
+        f_r_vector = Vector( [ (f_r_base_rotated[0] - f_r_curr[0]), (f_r_base_rotated[1] - f_r_curr[1]), (f_r_base_rotated[2] - f_r_curr[2])  ])
+        b_l_vector = Vector( [ (b_l_base_rotated[0] - b_l_curr[0]), (b_l_base_rotated[1] - b_l_curr[1]), (b_l_base_rotated[2] - b_l_curr[2])  ])
+        b_r_vector = Vector( [ (b_r_base_rotated[0] - b_r_curr[0]), (b_r_base_rotated[1] - b_r_curr[1]), (b_r_base_rotated[2] - b_r_curr[2])  ])
+
+        #self.add_line_to_vis("fl",f_l_base_rotated, f_l_curr )
+        #self.add_line_to_vis("fr",f_r_base_rotated, f_r_curr )
+        #self.add_line_to_vis("bl",b_l_base_rotated, b_l_curr )
+        #self.add_line_to_vis("br",b_r_base_rotated, b_r_curr )
+
+        #print "in three_legs_make_base_state()"
+        #print "front left vector:\t",f_l_vector
+        #print "front right vector:\t",f_r_vector
+        #print "back left vector:\t",b_l_vector
+        #print "back right vector:\t",b_r_vector
 
         # Front right
         if f_l_vector.multiple_vector_directions_are_equal([b_l_vector, b_r_vector]) and not f_l_vector.vector_directions_are_equal(f_r_vector):
-            return self.RobotUtils.F_R_FOOT
+            return RobotUtils.F_R_FOOT
 
         # Front left
         if f_r_vector.multiple_vector_directions_are_equal([b_l_vector, b_r_vector]) and not f_r_vector.vector_directions_are_equal(f_l_vector):
-            return self.RobotUtils.F_L_FOOT
+            return RobotUtils.F_L_FOOT
 
         # Back left
         if b_r_vector.multiple_vector_directions_are_equal([f_r_vector, f_l_vector]) and not b_r_vector.vector_directions_are_equal(b_l_vector):
-            return self.RobotUtils.B_L_FOOT
+            return RobotUtils.B_L_FOOT
 
         # Back right
         if b_l_vector.multiple_vector_directions_are_equal([f_r_vector, f_l_vector]) and not b_l_vector.vector_directions_are_equal(b_r_vector):
-            return self.RobotUtils.B_R_FOOT
+            return RobotUtils.B_R_FOOT
 
         return False
 
@@ -112,7 +237,7 @@ class MotionPlanner():
         '''
 
         end_affectors = []
-        end_affectors_temp = self.RobotUtils.end_affectors
+        end_affectors_temp = RobotUtils.end_affectors
         for end_affector in end_affectors_temp:
             end_affectors.append(end_affector)
 
@@ -124,9 +249,7 @@ class MotionPlanner():
             link_world_xyz = link.getWorldPosition([0,0,0])
             P.append(link_world_xyz)
 
-        support_tri = self._2DSupportPolygon(P)
-
-        return support_tri
+        return _2DSupportPolygon(P)
 
 
     def get_support_polygon_from_points(self, P, name=None):
@@ -137,7 +260,16 @@ class MotionPlanner():
         @return: _2DSupportPolygon object
         '''
 
-        return self._2DSupportPolygon(P, name=name)
+        return _2DSupportPolygon(P, name=name)
+
+
+
+    def point_is_in_multiple_support_polygon_intersections(self, curr_torso_world_xyz, _2DGeometry_objs):
+
+        first_2DGeom_obj = _2DGeometry_objs[0]
+        other_2DGeom_objs = _2DGeometry_objs[1:]
+        return first_2DGeom_obj.point_is_inside_intersection_of_multiple_2DGeometry_objects(curr_torso_world_xyz, other_2DGeom_objs )
+
 
     def point_is_in_support_polygon_intersection(self, support_poly1, support_poly2, P):
 
@@ -152,22 +284,150 @@ class MotionPlanner():
         return support_poly1.support_poly_is_in_intersection_with_other_2d_support_poly(support_poly2, P)
 
 
-    def get_end_affector_circle_from_xyz_r(self, xyz, r, name=None):
+    def get_end_affector_2D_support_circle_from_name(self,link_name, circle_name = None, at_point=None):
 
         '''
-        @summary returns a _2DLegRadius object with the specified x,y and r
-        @param xyz: [x,y,z] list containing centerpoint of the _2DLegRadius object
-        @param r: radius of circle
+        @summary returns a _2DLegRadius object given the end affectors name
+        @param link_name: string specifiing the link name
+        @param circle_name: name of circle
         @return: _2DLegRadius object
         '''
 
-        return self._2DLegRadius(xyz, r, name=name)
+        r = self.get_torso_range_from_end_affector(link_name, at_point=at_point)
+        global_xyz = self.get_end_affector_from_end_affector_name(link_name).getWorldPosition([0,0,0])
+        if at_point:
+            global_xyz = at_point
+        return _2DLegRadius(global_xyz, r, name=circle_name)
+
+
+    def add_line_to_vis(self,name,p1,p2):
+
+        traj = trajectory.Trajectory(milestones=[p1,p2])
+        vis.add(name,traj)
+
+
+    def get_torso_range_from_end_affector(self, end_affector_name, at_point=None ):
+
+        R = RobotUtils.END_AFFECTOR_RADIUS_TO_SHOULDER
+        S = RobotUtils.SHOULDER_TORSO_XY_EUCLIDEAN_DIF
+        yaw = self.get_current_torso_yaw_rads()
+        psi = RobotUtils.SHOULDER_TORSO_PSI_RADS
+
+        shoulder_link = self.get_shoulder_from_end_affector(end_affector_name)
+        shoulder_world_xyz = shoulder_link.getWorldPosition([0, 0, 0])
+
+        #print "yaw (deg): ",np.rad2deg(yaw)
+
+        #print "\nin get_torso_range_from_end_affector, end affector:",end_affector_name," shoulder:",shoulder_link.getName()
+
+        if end_affector_name == RobotUtils.F_L_FOOT:
+
+            link_global_xyz = self.f_l_end_affector.getWorldPosition([0, 0, 0])
+            if at_point:
+                link_global_xyz = at_point
+
+            leg_dx = shoulder_world_xyz[0] - link_global_xyz[0]
+            leg_dy = - (link_global_xyz[1] - shoulder_world_xyz[1])
+            theta = np.arctan2(leg_dy, leg_dx )
+
+            rx = R * np.cos(theta)
+            ry = R * np.sin(theta)
+
+            tx = - S * np.sin( (np.pi/2) - (yaw + psi))
+            ty = - S * np.cos( (np.pi/2) - (yaw + psi))
+
+            delta_y_max =  ry + ty
+            delta_x_max = rx + tx
+
+            #print "\n Front Left"
+            #print "leg-torso dx, dy:", leg_dx, "\t", leg_dy
+            #print "theta (deg):", np.rad2deg(theta)
+            #print "rx:", rx, "ry:", ry
+            #print "tx:", tx, "ty:", ty
+
+        elif end_affector_name == RobotUtils.B_L_FOOT:
+
+            link_global_xyz = self.b_l_end_affector.getWorldPosition([0, 0, 0])
+            if at_point:
+                link_global_xyz = at_point
+            leg_dx = shoulder_world_xyz[0] - link_global_xyz[0]
+            leg_dy = shoulder_world_xyz[1] - link_global_xyz[1]
+
+            theta = np.arctan2(leg_dy, leg_dx )
+
+            ry = R * np.sin(theta)
+            rx = R * np.cos(theta)
+
+            tx = S * np.cos( psi - yaw )
+            ty = - S * np.sin( psi - yaw )
+
+            #print "\n Back Left"
+            #print "leg-torso dx, dy:\t", leg_dx, "\t", leg_dy
+            #print "theta (deg):\t", np.rad2deg(theta)
+            #print "rx:\t", rx, "\try:", ry
+            #print "tx:\t", tx, "\tty:", ty
+
+            delta_y_max = ry + ty
+            delta_x_max = rx + tx
+
+        elif end_affector_name == RobotUtils.F_R_FOOT:
+
+            link_global_xyz = self.f_r_end_affector.getWorldPosition([0, 0, 0])
+            if at_point:
+                link_global_xyz = at_point
+            leg_dx = shoulder_world_xyz[0] - link_global_xyz[0]
+            leg_dy = shoulder_world_xyz[1] - link_global_xyz[1]
+            theta = np.arctan2(leg_dy, leg_dx )
+
+            rx = R * np.cos(theta)
+            ry = R * np.sin(theta)
+
+            tx = S * np.cos( yaw - psi - 180 )
+            ty = S * np.sin( yaw - psi - 180 )
+            
+            #print "\n Front Right"
+            #print "leg-torso dx, dy:", leg_dx, "\t", leg_dy
+            #print "theta (deg):", np.rad2deg(theta)
+            #print "rx:", rx, "ry:", ry
+            #print "tx:", tx, "ty:", ty
+
+            delta_y_max = ry + ty
+            delta_x_max = rx + tx
+
+        # back right
+        else:
+            link_global_xyz = self.b_r_end_affector.getWorldPosition([0, 0, 0])
+            if at_point:
+                link_global_xyz = at_point
+            leg_dx = (shoulder_world_xyz[0] - link_global_xyz[0])
+            leg_dy = (shoulder_world_xyz[1] - link_global_xyz[1])
+            theta = np.arctan2(leg_dy, leg_dx )
+
+            ry = R * np.sin(theta)
+            rx = R * np.cos(theta)
+            tx = S * np.cos(yaw + psi)
+            ty = S * np.sin(yaw + psi)
+
+            #print "\n Back Right"
+            #print "leg-torso dx, dy:", leg_dx, "\t", leg_dy
+            #print "theta (deg):", np.rad2deg(theta)
+            #print "rx:", rx, "ry:", ry
+            #print "tx:", tx, "ty:", ty
+
+            delta_y_max = ry + ty
+            delta_x_max = rx + tx
+
+        R = np.sqrt(delta_x_max ** 2 + delta_y_max ** 2)
+
+        #print "returning:",R
+        return R
+
 
 
     def get_centroid_from_multiple_poly_intersections(self, _2Dgeometryobjects):
 
         if len(_2Dgeometryobjects) < 2:
-            self.RobotUtils.ColorPrinter((self.__class__.__name__ + ".get_centroid_from_multiple_poly_intersections()"),
+            RobotUtils.ColorPrinter((self.__class__.__name__ + ".get_centroid_from_multiple_poly_intersections()"),
                                          "Error: _2Dgeometryobjects has less than two objects", "FAIL")
             return False
 
@@ -175,7 +435,6 @@ class MotionPlanner():
         rest = _2Dgeometryobjects[1:]
 
         return first_obj.xy_centroid_from_list_of_2DGeometry_objects(rest)
-
 
 
     def get_centroid_of_support_polygon_intersection(self, support_poly1, support_poly2):
@@ -189,8 +448,44 @@ class MotionPlanner():
 
         return support_poly1.xy_centroid_of_intersection(support_poly2)
 
+    def get_end_affectr_base_world_xyz_from_torso_world_xyz_and_yaw_deg(self, end_affector, torso_world_xyz, torso_final_yaw_degrees):
 
-    def get_torso_and_legs_delta_yaw_deg_and_xyz_offset(self, excluded_leg = None):
+        end_affector_local_base_xyz  = self.get_local_end_affector_base_state_from_end_affector_name(end_affector)
+        torso_final_yaw_rad = math.radians(torso_final_yaw_degrees)
+        yaw_rotation_aa = ([0, 0, 1], torso_final_yaw_rad)
+        yaw_rotation_R = so3.from_axis_angle(yaw_rotation_aa)
+        rotated_local_base_xyz = so3.apply(yaw_rotation_R, end_affector_local_base_xyz)
+
+        world_x = rotated_local_base_xyz[0] + torso_world_xyz[0]
+        world_y = rotated_local_base_xyz[1] + torso_world_xyz[1]
+        world_z = rotated_local_base_xyz[2]
+
+        base_p =  [world_x, world_y, world_z]
+
+        return base_p
+
+
+    def get_torso_world_xyz(self):
+
+        q = self.robosimian.getConfig()
+        return [q[0],q[1],q[2]]
+
+
+    def get_abs_yaw_deg_and_world_torso_xyz_commanded_from_legs(self, excluded_leg = None):
+
+        torso_world_xyz = self.get_torso_world_xyz()
+        delta_yaw_degrees, torso_commanded_xyz = self.get_delta_yaw_deg_and_world_torso_xyz_commanded_from_legs(excluded_leg = excluded_leg)
+
+        abs_yaw = np.degrees(self.get_current_torso_yaw_rads()) + delta_yaw_degrees
+
+        p1 = [torso_commanded_xyz[0],torso_commanded_xyz[1],torso_commanded_xyz[2]+.15]
+        p2 = [torso_world_xyz[0],torso_world_xyz[1],torso_world_xyz[2]+.15]
+        self.add_line_to_vis("torso shift to base", p1, p2)
+
+        return abs_yaw, torso_commanded_xyz
+
+
+    def get_delta_yaw_deg_and_world_torso_xyz_commanded_from_legs(self, excluded_leg = None):
 
         '''
         @summary: This function returns the yaw difference between the torso's commanded base state and the
@@ -208,18 +503,17 @@ class MotionPlanner():
         robot_world_x = q[0]
         robot_world_y = q[1]
 
+        #print "in get_torso_and_legs_delta_yaw_deg_and_xyz_offset, exluded leg:",excluded_leg
+
         if excluded_leg:
 
-            print "End affectors:",self.RobotUtils.end_affectors
-            print "excluded_leg:",excluded_leg
-
-            if not excluded_leg in self.RobotUtils.end_affectors:
-                self.RobotUtils.ColorPrinter((self.__class__.__name__ + ".get_legs_xyz_yaw()"),
+            if not excluded_leg in RobotUtils.end_affectors:
+                RobotUtils.ColorPrinter((self.__class__.__name__ + ".get_legs_xyz_yaw()"),
                                              "Error: excluded leg is a valid end affector name", "FAIL")
                 return False
 
 
-            if excluded_leg == self.RobotUtils.B_R_FOOT or excluded_leg == self.RobotUtils.F_L_FOOT:
+            if excluded_leg == RobotUtils.B_R_FOOT or excluded_leg == RobotUtils.F_L_FOOT:
                 diaganol_pos_1 = b_l_world
                 diaganol_pos_2 = f_r_world
 
@@ -227,36 +521,60 @@ class MotionPlanner():
                 diaganol_pos_1 = b_r_world
                 diaganol_pos_2 = f_l_world
 
-            if excluded_leg in self.RobotUtils.left_feet:
+            if excluded_leg in RobotUtils.left_feet:
                 legs_x_delta = f_r_world[0] - b_r_world[0]
                 legs_y_delta = f_r_world[1] - b_r_world[1]
+                #print "considering left feet.\nlegs x,y delta:\t",legs_x_delta,"\t",legs_y_delta
 
             else:
                 legs_x_delta = f_l_world[0] - b_l_world[0]
                 legs_y_delta = f_l_world[1] - b_l_world[1]
+                #print "considering right feet.\nlegs x,y delta:\t",legs_x_delta,"\t",legs_y_delta
 
             legs_commanded_x  = (diaganol_pos_1[0] + diaganol_pos_2[0]) / 2.0
             legs_commanded_y  = (diaganol_pos_1[1] + diaganol_pos_2[1]) / 2.0
 
-            xyz_offset = [legs_commanded_x - robot_world_x, legs_commanded_y - robot_world_y, 0]
-
         else:
 
             if not self.legs_make_base_state():
-                self.RobotUtils.ColorPrinter((self.__class__.__name__+".get_legs_xyz_yaw()"),"Error: Legs do not make a base state","FAIL")
+                RobotUtils.ColorPrinter((self.__class__.__name__+".get_legs_xyz_yaw()"),"Error: Legs do not make a base state","FAIL")
+                return False
 
             legs_x_delta = f_l_world[0] - b_l_world[0]
             legs_y_delta = f_l_world[1] - b_l_world[1]
 
+            #print "no excluded legs, considering left feet.\nlegs x,y delta:\t", legs_x_delta, "\t", legs_y_delta
+
             legs_commanded_x  = (f_l_world[0] + f_r_world[0] + b_l_world[0] + b_r_world[0]) / 4
             legs_commanded_y  = (f_l_world[1] + f_r_world[1] + b_l_world[1] + b_r_world[1]) / 4
 
-            xyz_offset = [  legs_commanded_x- robot_world_x,  legs_commanded_y - robot_world_y, 0]
+
+        current_torso_yaw_deg = (math.degrees(self.get_current_torso_yaw_rads()) % 360)
+        legs_yaw_degree = (math.degrees(np.arctan2( legs_y_delta , legs_x_delta ))  % 360)
+
+        delta_yaw_degrees = -(current_torso_yaw_deg - legs_yaw_degree) % 360
+
+        #print "\nlegs yaw degree:",legs_yaw_degree
+        #print "current_torso_yaw_deg:",current_torso_yaw_deg
+        #print "delta_yaw_degrees:",delta_yaw_degrees
+
+        if delta_yaw_degrees > 180 and delta_yaw_degrees < 360:
+            #print " delta yaw degrees is > 180 and < 360, sutracting 360"
+            delta_yaw_degrees -= 360
+
+        #print "delta_yaw_degrees normalizing [-180,180]:",delta_yaw_degrees,"\n"
 
 
-        legs_yaw_degree = math.degrees(math.atan(legs_y_delta / legs_x_delta))
+        #print "legs_yaw_degree:", legs_yaw_degree
+        #print "torso degree   :", current_torso_yaw_deg
+        #print "delta_yaw_degrees:", delta_yaw_degrees, "\n"
+        #print "legs commanded x, y:\t", legs_commanded_x, "\t", legs_commanded_y
 
-        return legs_yaw_degree, xyz_offset
+        torso_world_xyz_commanded = [legs_commanded_x, legs_commanded_y, q[2]]
+
+        #self.add_line_to_vis("torso shift",robot_start,robot_end )
+
+        return delta_yaw_degrees, torso_world_xyz_commanded
 
 
 
@@ -276,24 +594,31 @@ class MotionPlanner():
         z_end = float(endXYZ[2])
 
         x_delta = x_end - x_start
-        x = float(i) / float(i_max) * x_delta
+        x = 0
+        if np.abs(x_delta) > .01:
+            x = float(i) / float(i_max) * x_delta
 
         y_delta = y_end - y_start
-        y = float(i)/float(i_max) * y_delta
+        y = 0
+        if np.abs(y_delta) > .01:
+            y = float(i)/float(i_max) * y_delta
 
         z_delta = z_end - z_start
         z = float(i)/float(i_max) * z_delta
 
         # Arc height
-        h = float(self.RobotUtils.STEP_Z_MAX_HIEGHT)
+        h = float(RobotUtils.STEP_Z_MAX_HIEGHT)
         b = x_delta
 
         # see https://www.desmos.com/calculator/v8wb6o83jh
         #       ((-4*h)/(b**2)) * x * (x-b) -> Parabolic Arc
         #       + z                         -> linear Z offset
-        z_offset =  ((-4*h)/(b**2)) * x * (x-b) + z
+        if b != 0:
+            z_offset =  ( (-4*h) / (b**2)) * x * (x-b) + z
+        else:
+            z_offset = z
 
-        # print "x:",x,"\ty:",z_offset,"\t\tb:",b,"\th:",h
+        #print "x:",x,"\ty:",z_offset,"\t\tb:",b,"\th:",h
 
         res = [ x_start + x, y_start + y , z_start + z_offset ]
 
@@ -310,7 +635,7 @@ class MotionPlanner():
 
         robot_yaw_rad = self.get_current_torso_yaw_rads()
 
-        if end_affector_name in self.RobotUtils.left_feet:
+        if end_affector_name in RobotUtils.left_feet:
             r = [0, 0, -1, 0, -1, 0, -1, 0, 0]
 
         else:
@@ -320,7 +645,6 @@ class MotionPlanner():
         yaw_rotation_R = so3.from_axis_angle(yaw_rotation_aa)
 
         return so3.mul(yaw_rotation_R, r)
-
 
 
     def get_desired_torso_R_from_yaw_offset(self, yaw_offset_deg):
@@ -350,7 +674,7 @@ class MotionPlanner():
 
     def get_world_xyz_from_local_xyz(self, local_xyz):
 
-        torso = self.robosimian.link(self.RobotUtils.TORSO_LINK_INDEX)
+        torso = self.robosimian.link(RobotUtils.TORSO_LINK_INDEX)
 
         R = torso.getTransform()[0]
         T = torso.getTransform()[1]
@@ -366,6 +690,7 @@ class MotionPlanner():
     def get_local_end_affector_base_state_from_torso_translation(self, leg, translation, yaw_rotation_offset_degrees):
 
         '''
+        @rtype: object
         @param leg: string from RobotUtils specifying end affector
         @param translation: torso translation
         @param yaw_rotation_offset_degrees: yaw rotation
@@ -389,46 +714,19 @@ class MotionPlanner():
         return self.get_local_end_affector_base_state_from_torso_translation( end_affector_name, [0,0,0], offset_deg)
 
 
-
-    def get_extended_end_affector_local_xyz(self, end_affector_name, direction):
-
-        back_leg = end_affector_name in [self.RobotUtils.B_L_FOOT,self.RobotUtils.B_R_FOOT ]
-
-        a = 2
-
-        base_end_affector_state = self.get_local_end_affector_base_state_from_end_affector_name(end_affector_name)
-
-        # Make a copy of the end_affector state
-        xyz = [base_end_affector_state[0], base_end_affector_state[1], base_end_affector_state[2]]
-
-        # Add x offset (dependent on direction)
-        if direction == self.RobotUtils.FORWARD:
-            if back_leg:
-                xyz[0] += a*self.RobotUtils.STEP_X_DELTA
-            else:
-                xyz[0] += self.RobotUtils.STEP_X_DELTA
-        else:
-            if back_leg:
-                xyz[0] -= a*self.RobotUtils.STEP_X_DELTA
-            else:
-                xyz[0] -= self.RobotUtils.STEP_X_DELTA
-
-        return xyz
-
-
     def get_local_end_affector_base_state_from_end_affector_name(self, end_affector_name):
         
-        if not end_affector_name in self.RobotUtils.end_affectors:
-            self.RobotUtils.ColorPrinter(self.__class__.__name__,"Error: end_affector name unrecognized","FAIL")
+        if not end_affector_name in RobotUtils.end_affectors:
+            RobotUtils.ColorPrinter(self.__class__.__name__,"Error: end_affector name unrecognized","FAIL")
             return None
 
-        if end_affector_name == self.RobotUtils.B_L_FOOT:
+        if end_affector_name == RobotUtils.B_L_FOOT:
             base_end_affector_state = self.local_b_l_end_affector_base_state
 
-        elif (end_affector_name == self.RobotUtils.B_R_FOOT):
+        elif (end_affector_name == RobotUtils.B_R_FOOT):
             base_end_affector_state = self.local_b_r_end_affector_base_state
 
-        elif end_affector_name == self.RobotUtils.F_L_FOOT:
+        elif end_affector_name == RobotUtils.F_L_FOOT:
             base_end_affector_state = self.local_f_l_end_affector_base_state
 
         else:
@@ -437,21 +735,42 @@ class MotionPlanner():
         return base_end_affector_state
 
 
+    def get_shoulder_from_end_affector(self, end_affector_name):
+
+        if not end_affector_name in RobotUtils.end_affectors:
+            print_str = "Error: "+end_affector_name+" unrecognized"
+            RobotUtils.ColorPrinter(self.__class__.__name__,print_str,"FAIL")
+            return None
+
+        if end_affector_name == RobotUtils.B_L_FOOT:
+            end_affector = self.robosimian.link(RobotUtils.b_l_active_dofs[0])
+
+        elif (end_affector_name == RobotUtils.B_R_FOOT):
+            end_affector = self.robosimian.link(RobotUtils.b_r_active_dofs[0])
+
+        elif end_affector_name == RobotUtils.F_L_FOOT:
+            end_affector = self.robosimian.link(RobotUtils.f_l_active_dofs[0])
+
+        else:
+            end_affector = self.robosimian.link(RobotUtils.f_r_active_dofs[0])
+
+        return end_affector
+
 
     def get_end_affector_from_end_affector_name(self,end_affector_name):
 
-        if not end_affector_name in self.RobotUtils.end_affectors:
+        if not end_affector_name in RobotUtils.end_affectors:
             print_str = "Error: "+end_affector_name+" unrecognized"
-            self.RobotUtils.ColorPrinter(self.__class__.__name__,print_str,"FAIL")
+            RobotUtils.ColorPrinter(self.__class__.__name__,print_str,"FAIL")
             return None
 
-        if end_affector_name == self.RobotUtils.B_L_FOOT:
+        if end_affector_name == RobotUtils.B_L_FOOT:
             end_affector = self.b_l_end_affector
 
-        elif (end_affector_name == self.RobotUtils.B_R_FOOT):
+        elif (end_affector_name == RobotUtils.B_R_FOOT):
             end_affector = self.b_r_end_affector
 
-        elif end_affector_name == self.RobotUtils.F_L_FOOT:
+        elif end_affector_name == RobotUtils.F_L_FOOT:
             end_affector = self.f_l_end_affector
 
         else:

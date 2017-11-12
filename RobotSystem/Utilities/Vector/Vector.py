@@ -28,7 +28,9 @@ class Vector(object):
     def vector_directions_are_equal(self, oVector):
 
         if type(oVector) == type(self):
-            if self.get_euclidian_diff(self.V, oVector.V) > Vector.vector_dir_error_threshold:
+            euclidead_error = self.get_euclidian_diff(self.V, oVector.V)
+            #print "Vector: euclidean error:",euclidead_error
+            if euclidead_error > Vector.vector_dir_error_threshold:
                 return False
             return True
         else:
@@ -49,4 +51,4 @@ class Vector(object):
         d_y = (xyz1[1] - xyz2[1])**2
         d_z = (xyz1[2] - xyz2[2])**2
 
-        return math.sqrt( d_x +d_y  +d_z    )
+        return math.sqrt( d_x + d_y  +d_z    )

@@ -49,10 +49,48 @@ else:
     shift torso to B_t
 ```
 
+
+### End Affector Range Calculation
+```python
+let:
+    S' = the euclidean xy distance between a shoulder joint and the center of the robot
+    R' = the maxiumum euclidean xy distance between a end affector and shoulder joint. This is given by:
+        sqrt( (leg length)^2 - (delta z between end affector and shoulder)^2 )
+    psi = the angle between the torso's xy center and each shoulders xy position. This is measured from the side of the
+          robot to the line connecting the shoulder to the torso's center. This value is constant
+    yaw = the torso's current yaw
+    theta = the angle between the x axis and the line connecting the xy coordinate of a end affector and the respective shoulders xy end point
+      
+
+for front left end affector:
+    torso-end_affector delta y max = R' * sin(theta) - S' * cos( 90 - (yaw + psi))
+    torso-end_affector x max = R' * cos(theta) - S' * sin( 90 - (yaw + psi))
+
+for back left end affector:
+    torso-end_affector x max = R' * cos(theta) + S' * cos( psi - yaw )
+    torso-end_affector y max = R' * sin(theta) - S' * sin( psi - yaw )
+
+for front right end affector:
+    torso-end_affector x max = R' * cos(theta) - S' * sin( 90 -  ( psi - yaw ))
+    torso-end_affector y max = R' * sin(theta) + S' * cos( 90 - ( psi - yaw ))
+
+for back right end affector:
+    torso-end_affector y max = R' * sin(theta) + S' * sin( yaw + psi)
+    torso-end_affector x max = R' * cos(theta) + S' * cos( yaw + psi)
+
+
+```
+
 ![Reset Stage 1](https://github.com/JeremySMorgan/robosimian-gait-development/blob/master/torso_stage_1.png)
 
 ![Reset Stage 1](https://github.com/JeremySMorgan/robosimian-gait-development/blob/master/reset_stage_2.png)
 
+
+
+### General Notes
+
+- atan2(y,x) to used to calculate angles. The function uses the signs of the arguments to determine the quadrant of the result.
+- the x and z axes are swapped in local vs world coordinate system. for example, when in base state at the origin the robots front left end affector is at `[ 0.62227, -0.52703, -0.49019]` in the world frame but `[ -0.49015, 0.52705, -0.62229]` in its local frame.
 
 
 ### Notable Variables
