@@ -38,8 +38,7 @@ class RobotUtils(object):
     B_R_FOOT = "B_R_FOOT"
     B_L_FOOT = "B_L_FOOT"
 
-    robot_states = [FORWARD, BACKWARD, LEFT, RIGHT]
-    robot_turning_States = [LEFT, RIGHT]
+    allowed_states = [FORWARD, BASE_STATE]
 
     left_feet     = [F_L_FOOT, B_L_FOOT ]
     right_feet    = [F_R_FOOT, B_R_FOOT ]
@@ -65,9 +64,13 @@ class RobotUtils(object):
     IK_MAX_DEVIATION                    = .615
 
     # Base State Parameters
-    STARTING_CONFIG                     = [ 0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.05424, 0.66479, 0.07701, -1.79261, -0.13906, -0.44839, 0.12875, 0.00000, 0.08129, -0.72312, -0.03797, 2.07474, 0.12972, 0.22139, -0.22298, 0.00000, -0.07511, 0.72165, 0.03403, -2.07091, -0.11534, -0.22331, 0.21007, 0.00000, 0.08189, -0.70402, -0.03012, 2.07355, 0.11415, 0.20279, -0.21321]
-    BASE_STATE_X_DELTA                  = .32
-    BASE_STATE_Y_DELTA                  = BASE_STATE_X_DELTA
+
+    # starting config first below has legs high - prone to torso collisions
+    #STARTING_CONFIG = [0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.05424, 0.66479, 0.07701, -1.79261, -0.13906, -0.44839, 0.12875, 0.00000, 0.08129, -0.72312, -0.03797, 2.07474, 0.12972, 0.22139, -0.22298, 0.00000, -0.07511, 0.72165, 0.03403, -2.07091, -0.11534, -0.22331, 0.21007, 0.00000, 0.08189, -0.70402, -0.03012, 2.07355, 0.11415, 0.20279, -0.21321]
+    STARTING_CONFIG = [ 0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000, -0.05933, -1.44834, -0.44436, 2.14054, 0.06762, -2.25009, 0.55330, 0.00000, 0.07207, 1.43561, 0.44054, -2.12907, -0.07428, 2.25008, -0.54579, 0.00000, -0.06722, -1.43800, -0.43682, 2.13177, 0.07243, -2.25090, 0.54626, 0.00000, 0.06733, 1.43761, 0.43633, -2.13147, -0.07257, 2.25096, -0.54595]
+
+    BASE_STATE_X_DELTA                  = .35
+    BASE_STATE_Y_DELTA                  = .2
     BASE_STATE_Z_DELTA                  = -.5 # This value is the delta z from the torso to the ground (/end affectors center point)
 
     # Robot Measurements
@@ -87,11 +90,11 @@ class RobotUtils(object):
     FORWARD_STEP_VISUALIZATION_ENABLED  = True
 
     # Reset Constants
-    MINIMUM_DIST_TO_CAUSE_RESET         = .001
+    MINIMUM_DIST_TO_CAUSE_RESET         = .005
     MINIMUM_X_DELTA                     = .05
     MINIMUM_Y_DELTA                     = .05
     MINIMUM_Z_DELTA                     = .015      # all z deltas above this will trigger a reset
-    MAX_ALLOWABLE_END_EFFECTR_ANGLE_ERR       = .5
+    MAX_ALLOWABLE_END_EFFECTR_ANGLE_ERR = .5
     MAX_ALLOWABLE_LR_ERR                = .01
     MAX_ALLOWABLE_FB_ERR                = .025
 
@@ -113,11 +116,11 @@ class RobotUtils(object):
     # Movement timing constants
     if PHYSICS_ENABLED:
         INITIALIZATION_STEP_TIME            = 2
-        RESET_LEG_STEP_TIME                 = 5
-        TURN_TIME                           = 5
-        TORSO_SHIFT_TIME                    = 7
-        STEP_TIME                           = 6
-        TORSO_YAW_ROTATE_TIME               = 5
+        RESET_LEG_STEP_TIME                 = 4
+        TURN_TIME                           = 4
+        TORSO_SHIFT_TIME                    = 4
+        STEP_TIME                           = 4
+        TORSO_YAW_ROTATE_TIME               = 4
 
     else:
         INITIALIZATION_STEP_TIME            = .5
@@ -186,6 +189,6 @@ class RobotUtils(object):
 
     @staticmethod
     def pp_double(dbl):
-        s = "%.4f" % dbl
+        s = "%.5f" % dbl
         return s
 

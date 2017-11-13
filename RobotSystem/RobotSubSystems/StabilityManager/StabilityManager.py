@@ -1,21 +1,21 @@
 from klampt.model.collide import WorldCollider
+from ...Utilities.RobotUtils.RobotUtils import RobotUtils
 
 class StabilityManager(object):
 
-    def __init__(self, world, sim, RobotUtils):
+    def __init__(self, world, sim):
 
         self.world = world
         self.robosimian = world.robot(0)
         self.sim = sim
-        self.RobotUtils = RobotUtils
         self.vel_limits = self.robosimian.getVelocityLimits()
         self.torque_limits = self.robosimian.getTorqueLimits()
         self.ColliisonCalculator = WorldCollider(world)
 
 
     def check_status(self):
-        #self.check_torque()
-        #self.check_v()
+        self.check_torque()
+        self.check_v()
         self.check_collisions()
 
 
@@ -35,9 +35,8 @@ class StabilityManager(object):
 
             if torq_c > torq_m:
                 if i > 5:
-                    t_print_str += link_name + ": " + self.RobotUtils.pp_double(torq_c) + "> max: " + str(torq_m) + "\t"
+                    t_print_str += link_name + ": " + RobotUtils.pp_double(torq_c) + "> max: " + str(torq_m) + "\t"
                     print_t = True
-
 
         if print_t:
             print(t_print_str)
@@ -49,7 +48,9 @@ class StabilityManager(object):
         for collision in collisions:
             link_1_name = collision[0].getName()
             link_2_name = collision[1].getName()
-            print "Collision detected between",link_1_name," and",link_2_name
+            error_str = "Collision detected between"+link_1_name+" and"+link_2_name
+            RobotUtils.ColorPrinter((self.__class__.__name__+".check_collisions()"),error_str,"FAIL" )
+
 
 
     def check_v(self):
@@ -65,7 +66,7 @@ class StabilityManager(object):
             vel_c = vel[i] if vel[i] > 0 else (-1) * vel[i]
             link_name = self.robosimian.link(i).getName()
             if vel_c > vel_m:
-                v_print_str += link_name + ": " + self.RobotUtils.pp_double(vel_c) + ", max: " + str( vel_m) + "\t| "
+                v_print_str += link_name + ": " + RobotUtils.pp_double(vel_c) + ", max: " + str( vel_m) + "\t| "
                 print_v = True
 
         if print_v:

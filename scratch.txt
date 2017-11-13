@@ -1,0 +1,90 @@
+
+        '''
+        @summary: This function returns true if the legs CAN compose a base state, that is that the robot could enter a
+                    base state by only moving the torso. This is done as following:
+                        checking to see that
+                            1) the angles formed by the angles defined by (fl, bl, br) and (br,fr,fl) legs are both 90
+                            2) the distance between back legs equals RobotUtils.LEFT_RIGHT_LEGS_EUCLIDEAN_DIST
+                            3) the distance between back and front legs equals RobotUtils.FORWARD_BACK_LEGS_EUCLIDEAN_DIST
+
+        @return: boolean
+        '''
+
+        default_left_right_dist = RobotUtils.LEFT_RIGHT_LEGS_EUCLIDEAN_DIST
+        default_front_back_dist = RobotUtils.FORWARD_BACK_LEGS_EUCLIDEAN_DIST
+
+        f_l_curr = self.f_l_end_affector.getWorldPosition([0, 0, 0])
+        f_r_curr = self.f_r_end_affector.getWorldPosition([0, 0, 0])
+        b_l_curr = self.b_l_end_affector.getWorldPosition([0, 0, 0])
+        b_r_curr = self.b_r_end_affector.getWorldPosition([0, 0, 0])
+
+        br_angle_deg = (RobotUtils.angle_between_three_points(b_l_curr, b_r_curr, f_r_curr) % 360)
+        fl_angle_deg = (RobotUtils.angle_between_three_points(f_r_curr, f_l_curr, b_l_curr) % 360)
+        bl_angle_deg = (RobotUtils.angle_between_three_points(f_l_curr, b_l_curr, b_r_curr) % 360)
+        fr_angle_deg = (RobotUtils.angle_between_three_points(b_r_curr, f_r_curr, f_l_curr) % 360)
+
+        if np.fabs(br_angle_deg - self.br_base_angle_deg) > RobotUtils.MAX_ALLOWABLE_END_EFFECTR_ANGLE_ERR:
+            #print "Error: br angle not in base angle:", br_angle_deg
+            return False
+
+        if np.fabs(fl_angle_deg - self.fl_base_angle_deg) > RobotUtils.MAX_ALLOWABLE_END_EFFECTR_ANGLE_ERR:
+            #print "Error: fl angle not in base angle:", fl_angle_deg
+            return False
+
+        if np.fabs(bl_angle_deg - self.bl_base_angle_deg) > RobotUtils.MAX_ALLOWABLE_END_EFFECTR_ANGLE_ERR:
+            #print "Error: bl angle not in base angle:", bl_angle_deg
+            return False
+
+        if np.fabs(fr_angle_deg - self.fr_base_angle_deg) > RobotUtils.MAX_ALLOWABLE_END_EFFECTR_ANGLE_ERR:
+            #print "Error: fr angle not in base angle:", fr_angle_deg
+            return False
+
+        #print "br angle:",br_angle_deg
+        #print "fl angle:",fl_angle_deg
+        #print "bl angle:",bl_angle_deg
+        #print "fr angle:",fr_angle_deg
+
+        left_side_fb_dist = RobotUtils.get_euclidian_diff(f_l_curr, b_l_curr)
+        right_side_fb_dist = RobotUtils.get_euclidian_diff(f_r_curr, b_r_curr)
+
+        front_lr_dist = RobotUtils.get_euclidian_diff(f_l_curr, f_r_curr)
+        back_lr_dist = RobotUtils.get_euclidian_diff(b_l_curr, b_r_curr)
+
+        #print " left_side_fb_dist:",left_side_fb_dist
+        #print " right_side_fb_dist:",right_side_fb_dist
+        #print " front_lr_dist:",front_lr_dist
+        #print " back_lr_dist:",back_lr_dist
+
+        if np.fabs(left_side_fb_dist - right_side_fb_dist) > .01:
+            #print "Error: left_side_fb_dist and right_side_fb_dist do not equal. error:", np.fabs(left_side_fb_dist - right_side_fb_dist)
+            return False
+
+        if np.fabs(front_lr_dist - back_lr_dist) > .01:
+            #print "Error: left_side_fb_dist  and ight_side_fb_dist are not equal. error:", np.fabs(left_side_fb_dist - right_side_fb_dist)
+            return False
+
+        lr_error = np.fabs(back_lr_dist - default_left_right_dist)
+        if lr_error > RobotUtils.MAX_ALLOWABLE_LR_ERR:
+            #print "error: left right error> MAX_ALLOWABLE_LR_ERR. error, max error:",lr_error, RobotUtils.MAX_ALLOWABLE_LR_ERR
+            return False
+
+
+        # Measured front back difference : 1.1181
+        # Measured left right difference : 1.1129
+
+
+        #print "\ndefault LEFT RIGHT distance:",default_left_right_dist
+        #print "current LEFT RIGHT distance:",back_lr_dist,"\n"
+        #print "default FRONT BACK distance:",default_front_back_dist
+        #print "current FRONT BACK distance:",right_side_fb_dist
+
+        fb_error = np.fabs(left_side_fb_dist - default_front_back_dist)
+        if fb_error > RobotUtils.MAX_ALLOWABLE_FB_ERR:
+            #print "\nerror when comparing left sides front back distance."
+            #print "front back distance: ",left_side_fb_dist
+            #print "default FRONT BACK distance:",default_front_back_dist
+            #print "Error: ",fb_error
+            #print "max allowable error:",RobotUtils.MAX_ALLOWABLE_FB_ERR,"\n"
+            return False
+
+        return True

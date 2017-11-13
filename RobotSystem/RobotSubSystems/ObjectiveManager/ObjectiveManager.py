@@ -1,15 +1,15 @@
 import threading
 import time
 from ...Utilities.MotionThread.MotionThread import MotionThread
+from ...Utilities.RobotUtils.RobotUtils import RobotUtils
 
 class ObjectiveManager(object):
 
 
     # RobotUtils, self.MotionPlanner, self.HighLevelMotionController, self.UserInput )
-    def __init__(self, RobotUtils, MotionPlanner, HighLevelMotionController, UserInput):
+    def __init__(self, MotionPlanner, HighLevelMotionController, UserInput):
 
         # Robot Systems
-        self.RobotUtils                     = RobotUtils
         self.MotionPlanner                  = MotionPlanner
         self.HighLevelMotionController      = HighLevelMotionController
         self.UserInput                      = UserInput
@@ -27,7 +27,7 @@ class ObjectiveManager(object):
 
 
     # Start input loop
-    def start_objective_management_loop(self):
+    def start(self):
 
         self.initializatoin_thread = MotionThread( self.HighLevelMotionController.set_inital_config, "obj_manager_update_loop")
         self.obj_manager_update_loop_thread = MotionThread( self.obj_manager_update_loop, "obj_manager_update_loop")
@@ -39,6 +39,8 @@ class ObjectiveManager(object):
     def update_agenda(self):
 
         desired_state = self.UserInput.get_desired_robot_state()
+        if self.UserInput.get_print_config():
+            self.MotionPlanner.print_config()
 
         # Currently doing desired state
         if self.current_robot_state == desired_state:
@@ -51,62 +53,62 @@ class ObjectiveManager(object):
             # Cancel current movement
             if not self.robot_motion_thread is None:
 
-                if self.RobotUtils.OBJ_PLANNER_DEBUGGING_ENABLED:
+                if RobotUtils.OBJ_PLANNER_DEBUGGING_ENABLED:
                     status = "Suspending " + self.robot_motion_thread.get_name() + " thread"
-                    self.RobotUtils.ColorPrinter( (self.__class__.__name__+".update_agenda()" ), status, "FAIL")
+                    RobotUtils.ColorPrinter( (self.__class__.__name__+".update_agenda()" ), status, "FAIL")
 
                 self.robot_motion_thread.shutdown()
 
 
             # In base state - done
-            if desired_state == self.RobotUtils.BASE_STATE:
-                self.current_robot_state = self.RobotUtils.BASE_STATE
+            if desired_state == RobotUtils.BASE_STATE:
+                self.current_robot_state = RobotUtils.BASE_STATE
 
 
             # Else start new motion
-            elif desired_state == self.RobotUtils.LEFT:
+            elif desired_state == RobotUtils.LEFT:
 
-                if self.RobotUtils.OBJ_PLANNER_DEBUGGING_ENABLED:
+                if RobotUtils.OBJ_PLANNER_DEBUGGING_ENABLED:
                     status = "starting 'make_left_turn' thread"
-                    self.RobotUtils.ColorPrinter((self.__class__.__name__+".update_agenda()" ), status, "OKGREEN")
+                    RobotUtils.ColorPrinter((self.__class__.__name__+".update_agenda()" ), status, "OKGREEN")
 
                 self.robot_motion_thread = MotionThread(self.HighLevelMotionController.make_left_turn, "left turn", pass_motion_thread=True)
-                self.current_robot_state = self.RobotUtils.LEFT
+                self.current_robot_state = RobotUtils.LEFT
 
 
-            elif desired_state == self.RobotUtils.RIGHT:
+            elif desired_state == RobotUtils.RIGHT:
 
-                if self.RobotUtils.OBJ_PLANNER_DEBUGGING_ENABLED:
+                if RobotUtils.OBJ_PLANNER_DEBUGGING_ENABLED:
                     status = "Starting right turn thread"
-                    self.RobotUtils.ColorPrinter((self.__class__.__name__+".update_agenda()" ), status, "OKGREEN")
+                    RobotUtils.ColorPrinter((self.__class__.__name__+".update_agenda()" ), status, "OKGREEN")
 
-                self.current_robot_state = self.RobotUtils.RIGHT
+                self.current_robot_state = RobotUtils.RIGHT
                 self.robot_motion_thread = MotionThread(self.HighLevelMotionController.make_right_turn, "right turn",pass_motion_thread=True)
 
 
-            elif desired_state == self.RobotUtils.FORWARD:
+            elif desired_state == RobotUtils.FORWARD:
 
-                if self.RobotUtils.OBJ_PLANNER_DEBUGGING_ENABLED:
+                if RobotUtils.OBJ_PLANNER_DEBUGGING_ENABLED:
                     status = "Starting forward walk thread"
-                    self.RobotUtils.ColorPrinter((self.__class__.__name__+".update_agenda()" ), status, "OKGREEN")
+                    RobotUtils.ColorPrinter((self.__class__.__name__+".update_agenda()" ), status, "OKGREEN")
 
-                self.current_robot_state = self.RobotUtils.FORWARD
+                self.current_robot_state = RobotUtils.FORWARD
 
                 self.robot_motion_thread = MotionThread(self.HighLevelMotionController.forward_walk,"forward walk",pass_motion_thread=True)
 
 
-            elif desired_state == self.RobotUtils.BACKWARD:
+            elif desired_state == RobotUtils.BACKWARD:
 
-                if self.RobotUtils.OBJ_PLANNER_DEBUGGING_ENABLED:
+                if RobotUtils.OBJ_PLANNER_DEBUGGING_ENABLED:
                     status = "Starting backward walk thread"
-                    self.RobotUtils.ColorPrinter((self.__class__.__name__+".update_agenda()" ), status, "OKGREEN")
+                    RobotUtils.ColorPrinter((self.__class__.__name__+".update_agenda()" ), status, "OKGREEN")
 
-                self.current_robot_state = self.RobotUtils.BACKWARD
+                self.current_robot_state = RobotUtils.BACKWARD
 
                 self.robot_motion_thread = MotionThread(self.HighLevelMotionController.backward_walk,"backward walk",pass_motion_thread=True)
 
             else:
-                self.RobotUtils.ColorPrinter((self.__class__.__name__+".update_agenda()" ), "Update agenda error: desired robot state unrecognized","FAIL")
+                RobotUtils.ColorPrinter((self.__class__.__name__+".update_agenda()" ), "Update agenda error: desired robot state unrecognized","FAIL")
 
 
 
@@ -115,7 +117,7 @@ class ObjectiveManager(object):
         while 1:
             if not self.obj_manager_update_loop_thread is None:
                 if self.obj_manager_update_loop_thread.is_alive():
-                    time.sleep(self.RobotUtils.OBJECTIVE_PLANNER_UPDATE_DELAY)
+                    time.sleep(RobotUtils.OBJECTIVE_PLANNER_UPDATE_DELAY)
                     self.update_agenda()
                 else:
                     break
@@ -132,6 +134,6 @@ class ObjectiveManager(object):
             status += "and Motion"
 
         status += " thread"
-        self.RobotUtils.ColorPrinter(self.__class__.__name__, status, "FAIL")
+        RobotUtils.ColorPrinter(self.__class__.__name__, status, "FAIL")
 
 

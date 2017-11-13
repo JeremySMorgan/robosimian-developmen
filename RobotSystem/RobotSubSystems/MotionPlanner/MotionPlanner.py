@@ -63,95 +63,82 @@ class MotionPlanner():
 
     def legs_make_base_state(self):
 
-        '''
-        @summary: This function returns true if the legs CAN compose a base state, that is that the robot could enter a
-                    base state by only moving the torso. This is done as following:
-                        checking to see that
-                            1) the angles formed by the angles defined by (fl, bl, br) and (br,fr,fl) legs are both 90
-                            2) the distance between back legs equals RobotUtils.LEFT_RIGHT_LEGS_EUCLIDEAN_DIST
-                            3) the distance between back and front legs equals RobotUtils.FORWARD_BACK_LEGS_EUCLIDEAN_DIST
-
-        @return: boolean
-        '''
-
-        default_left_right_dist = RobotUtils.LEFT_RIGHT_LEGS_EUCLIDEAN_DIST
-        default_front_back_dist = RobotUtils.FORWARD_BACK_LEGS_EUCLIDEAN_DIST
+        # TODO: Fix bug. base states should not be rotated by torso rad, as this may not equal the yaw commanded by legs
 
         f_l_curr = self.f_l_end_affector.getWorldPosition([0, 0, 0])
         f_r_curr = self.f_r_end_affector.getWorldPosition([0, 0, 0])
         b_l_curr = self.b_l_end_affector.getWorldPosition([0, 0, 0])
         b_r_curr = self.b_r_end_affector.getWorldPosition([0, 0, 0])
 
-        br_angle_deg = (RobotUtils.angle_between_three_points(b_l_curr, b_r_curr, f_r_curr) % 360)
-        fl_angle_deg = (RobotUtils.angle_between_three_points(f_r_curr, f_l_curr, b_l_curr) % 360)
-        bl_angle_deg = (RobotUtils.angle_between_three_points(f_l_curr, b_l_curr, b_r_curr) % 360)
-        fr_angle_deg = (RobotUtils.angle_between_three_points(b_r_curr, f_r_curr, f_l_curr) % 360)
+        legs_x_delta = f_l_curr[0] - b_l_curr[0]
+        legs_y_delta = f_l_curr[1] - b_l_curr[1]
 
-        if np.fabs(br_angle_deg - self.br_base_angle_deg) > RobotUtils.MAX_ALLOWABLE_END_EFFECTR_ANGLE_ERR:
-            #print "Error: br angle not in base angle:", br_angle_deg
-            return False
+        legs_commanded_yaw_rad = np.arctan2( legs_y_delta , legs_x_delta )  % 360
 
-        if np.fabs(fl_angle_deg - self.fl_base_angle_deg) > RobotUtils.MAX_ALLOWABLE_END_EFFECTR_ANGLE_ERR:
-            #print "Error: fl angle not in base angle:", fl_angle_deg
-            return False
+        #print "legs commanded yaw rad: ",legs_commanded_yaw_rad
 
-        if np.fabs(bl_angle_deg - self.bl_base_angle_deg) > RobotUtils.MAX_ALLOWABLE_END_EFFECTR_ANGLE_ERR:
-            #print "Error: bl angle not in base angle:", bl_angle_deg
-            return False
+        yaw_rotation_aa = ([0, 0, 1], legs_commanded_yaw_rad)
+        yaw_rotation_R = so3.from_axis_angle(yaw_rotation_aa)
 
-        if np.fabs(fr_angle_deg - self.fr_base_angle_deg) > RobotUtils.MAX_ALLOWABLE_END_EFFECTR_ANGLE_ERR:
-            #print "Error: fr angle not in base angle:", fr_angle_deg
-            return False
+        f_l_base = self.local_f_l_end_affector_base_state
+        f_r_base = self.local_f_r_end_affector_base_state
+        b_l_base = self.local_b_l_end_affector_base_state
+        b_r_base = self.local_b_r_end_affector_base_state
 
-        #print "br angle:",br_angle_deg
-        #print "fl angle:",fl_angle_deg
-        #print "bl angle:",bl_angle_deg
-        #print "fr angle:",fr_angle_deg
+        f_l_base_rotated = so3.apply(yaw_rotation_R, f_l_base)
+        f_r_base_rotated = so3.apply(yaw_rotation_R, f_r_base)
+        b_l_base_rotated = so3.apply(yaw_rotation_R, b_l_base)
+        b_r_base_rotated = so3.apply(yaw_rotation_R, b_r_base)
 
-        left_side_fb_dist = RobotUtils.get_euclidian_diff(f_l_curr, b_l_curr)
-        right_side_fb_dist = RobotUtils.get_euclidian_diff(f_r_curr, b_r_curr)
+        # print "fl curr:",f_l_curr
+        # print "fr curr:",f_r_curr
+        # print "bl curr:",b_l_curr
+        # print "br curr:",b_r_curr
 
-        front_lr_dist = RobotUtils.get_euclidian_diff(f_l_curr, f_r_curr)
-        back_lr_dist = RobotUtils.get_euclidian_diff(b_l_curr, b_r_curr)
+        # print "fl base:",f_l_base
+        # print "fr base:",f_r_base
+        # print "bl base:",b_l_base
+        # print "br base:",b_r_base
 
-        #print " left_side_fb_dist:",left_side_fb_dist
-        #print " right_side_fb_dist:",right_side_fb_dist
-        #print " front_lr_dist:",front_lr_dist
-        #print " back_lr_dist:",back_lr_dist
+        f_l_vector = Vector( [ (f_l_base_rotated[0] - f_l_curr[0]), (f_l_base_rotated[1] - f_l_curr[1]), (f_l_base_rotated[2] - f_l_curr[2])  ])
+        f_r_vector = Vector( [ (f_r_base_rotated[0] - f_r_curr[0]), (f_r_base_rotated[1] - f_r_curr[1]), (f_r_base_rotated[2] - f_r_curr[2])  ])
+        b_l_vector = Vector( [ (b_l_base_rotated[0] - b_l_curr[0]), (b_l_base_rotated[1] - b_l_curr[1]), (b_l_base_rotated[2] - b_l_curr[2])  ])
+        b_r_vector = Vector( [ (b_r_base_rotated[0] - b_r_curr[0]), (b_r_base_rotated[1] - b_r_curr[1]), (b_r_base_rotated[2] - b_r_curr[2])  ])
 
-        if np.fabs(left_side_fb_dist - right_side_fb_dist) > .01:
-            #print "Error: left_side_fb_dist and right_side_fb_dist do not equal. error:", np.fabs(left_side_fb_dist - right_side_fb_dist)
-            return False
+        #self.add_line_to_vis("fl",f_l_base_rotated, f_l_curr )
+        #self.add_line_to_vis("fr",f_r_base_rotated, f_r_curr )
+        #self.add_line_to_vis("bl",b_l_base_rotated, b_l_curr )
+        #self.add_line_to_vis("br",b_r_base_rotated, b_r_curr )
 
-        if np.fabs(front_lr_dist - back_lr_dist) > .01:
-            #print "Error: left_side_fb_dist  and ight_side_fb_dist are not equal. error:", np.fabs(left_side_fb_dist - right_side_fb_dist)
-            return False
+        #print "\nin legs_make_base_state()"
+        #print "front left vector:\t",f_l_vector
+        #print "front right vector:\t",f_r_vector
+        #print "back left vector:\t",b_l_vector
+        #print "back right vector:\t",b_r_vector
 
-        lr_error = np.fabs(back_lr_dist - default_left_right_dist)
-        if lr_error > RobotUtils.MAX_ALLOWABLE_LR_ERR:
-            #print "error: left right error> MAX_ALLOWABLE_LR_ERR. error, max error:",lr_error, RobotUtils.MAX_ALLOWABLE_LR_ERR
-            return False
+        # Front right
+        if f_l_vector.multiple_vector_directions_are_equal([b_l_vector, b_r_vector, f_r_vector]):
 
+            if f_r_vector.multiple_vector_directions_are_equal([b_l_vector, b_r_vector]):
 
-        # Measured front back difference : 1.1181
-        # Measured left right difference : 1.1129
+                if b_l_vector.multiple_vector_directions_are_equal([b_r_vector]):
+                    #print "all vectors equal, returning true"
+                    return True
+                else:
+                    pass
+                    # bl and br are not equal
+                    #print "bl and br vectors are NOT equal, returning false"
 
+            else:
+                pass
+                #print "fr and [bl and br] vectors are NOT equal, returning false"
+                # fr and [bl,br] not equal
+        else:
+            pass
+            #print "fl and [bl  br or fr] vectors are NOT equal, returning false"
+            # fl and [bl br fr ] not equal
 
-        #print "\ndefault LEFT RIGHT distance:",default_left_right_dist
-        #print "current LEFT RIGHT distance:",back_lr_dist,"\n"
-        #print "default FRONT BACK distance:",default_front_back_dist
-        #print "current FRONT BACK distance:",right_side_fb_dist
-
-        fb_error = np.fabs(left_side_fb_dist - default_front_back_dist)
-        if fb_error > RobotUtils.MAX_ALLOWABLE_FB_ERR:
-            #print "\nerror when comparing left sides front back distance."
-            #print "front back distance: ",left_side_fb_dist
-            #print "default FRONT BACK distance:",default_front_back_dist
-            #print "Error: ",fb_error
-            #print "max allowable error:",RobotUtils.MAX_ALLOWABLE_FB_ERR,"\n"
-            return False
-
-        return True
+        return False
 
 
     # TODO: This function likely has bugs. Need to test when the robot is rotated
@@ -203,7 +190,7 @@ class MotionPlanner():
         #self.add_line_to_vis("bl",b_l_base_rotated, b_l_curr )
         #self.add_line_to_vis("br",b_r_base_rotated, b_r_curr )
 
-        #print "in three_legs_make_base_state()"
+        #print "\nin three_legs_make_base_state()"
         #print "front left vector:\t",f_l_vector
         #print "front right vector:\t",f_r_vector
         #print "back left vector:\t",b_l_vector
@@ -304,6 +291,9 @@ class MotionPlanner():
 
         traj = trajectory.Trajectory(milestones=[p1,p2])
         vis.add(name,traj)
+
+    def print_config(self):
+        print RobotUtils.pp_list(self.robosimian.getConfig())
 
 
     def get_torso_range_from_end_affector(self, end_affector_name, at_point=None ):
@@ -499,10 +489,6 @@ class MotionPlanner():
         b_l_world = self.b_l_end_affector.getWorldPosition([0, 0, 0])
         b_r_world = self.b_r_end_affector.getWorldPosition([0, 0, 0])
 
-        q = self.robosimian.getConfig()
-        robot_world_x = q[0]
-        robot_world_y = q[1]
-
         #print "in get_torso_and_legs_delta_yaw_deg_and_xyz_offset, exluded leg:",excluded_leg
 
         if excluded_leg:
@@ -511,7 +497,6 @@ class MotionPlanner():
                 RobotUtils.ColorPrinter((self.__class__.__name__ + ".get_legs_xyz_yaw()"),
                                              "Error: excluded leg is a valid end affector name", "FAIL")
                 return False
-
 
             if excluded_leg == RobotUtils.B_R_FOOT or excluded_leg == RobotUtils.F_L_FOOT:
                 diaganol_pos_1 = b_l_world
@@ -570,7 +555,7 @@ class MotionPlanner():
         #print "delta_yaw_degrees:", delta_yaw_degrees, "\n"
         #print "legs commanded x, y:\t", legs_commanded_x, "\t", legs_commanded_y
 
-        torso_world_xyz_commanded = [legs_commanded_x, legs_commanded_y, q[2]]
+        torso_world_xyz_commanded = [legs_commanded_x, legs_commanded_y, self.robosimian.getConfig()[2]]
 
         #self.add_line_to_vis("torso shift",robot_start,robot_end )
 

@@ -18,10 +18,9 @@ if RobotUtils.SIMULATION_ENABLED:
     from klampt import vis
 
 
-
 class Hypervisor():
 
-    def __init__(self,robot_file, world_file):
+    def __init__(self, robot_file, world_file):
 
         self.robot_file = robot_file
         self.world_file = world_file
@@ -30,7 +29,6 @@ class Hypervisor():
         self.MotionController = None
         self.MotionPlanner = None
         self.gravity_paused = True
-
 
     def start(self):
 
@@ -69,35 +67,27 @@ class Hypervisor():
         self.controller.setRate(RobotUtils.CONTROLLER_DT)
 
         # Initilialize RobotSubsystems
-        self.StabilityManager = StabilityManager(sim_world, self.sim, RobotUtils)
+        self.SimWorldStabilityManager = StabilityManager(sim_world, self.sim)
+        self.PlannerWorldStabilityManager = StabilityManager(self.planning_world, self.sim)
         self.HighLevelMotionController = HighLevelMotionController(self.planning_world_robosimian, self.controller)
         self.MotionPlanner = MotionPlanner(self.planning_world_robosimian)
         self.HighLevelMotionController.initialize_motion_planner(self.MotionPlanner)
 
         # Initialize Utility Classes
         self.UserInput = UserInput()
-        self.ObjectiveManager = ObjectiveManager(RobotUtils, self.MotionPlanner, self.HighLevelMotionController, self.UserInput )
-        self.PlanningWorldRobotInspector = RobotInspector(self.planning_world_robosimian, RobotUtils, self.MotionPlanner)
-        self.SimWorldRobotInspector = RobotInspector(self.planning_world_robosimian, RobotUtils, self.MotionPlanner)
+        self.ObjectiveManager = ObjectiveManager(self.MotionPlanner, self.HighLevelMotionController, self.UserInput )
+        self.PlanningWorldRobotInspector = RobotInspector(self.planning_world_robosimian, self.MotionPlanner, self.HighLevelMotionController)
+        self.SimWorldRobotInspector = RobotInspector(self.planning_world_robosimian, self.MotionPlanner, self.HighLevelMotionController)
 
-        self.PlanningWorldRobotInspector.add_line_to_vis(" --- X --- ", [1, 0, 0], [0, 0, 0])
-        self.PlanningWorldRobotInspector.add_line_to_vis(" --- Y --- ", [0, 1, 0], [0, 0, 0])
+        # Start RobotSubsystems
+        self.UserInput.start()
+        self.ObjectiveManager.start()
 
         RobotUtils.ColorPrinter(self.__class__.__name__,"Hypervisor initialization finished","OKBLUE")
 
-        self.UserInput.start()
-        self.ObjectiveManager.start_objective_management_loop()
-
-        '''
-        while not self.HighLevelMotionController.initialization_complete:
-            time.sleep(.05)
-            print "waiting for initialization"
-
-        self.PlanningWorldRobotInspector.shift_x(amount=1)
-        self.PlanningWorldRobotInspector.shift_y(amount=2)
-        self.PlanningWorldRobotInspector.rotate_yaw(degree=-45)
-        '''
-
+        # run visualizations
+        self.PlanningWorldRobotInspector.add_line_to_vis(" --- X --- ", [1, 0, 0], [0, 0, 0])
+        self.PlanningWorldRobotInspector.add_line_to_vis(" --- Y --- ", [0, 1, 0], [0, 0, 0])
         self.run_visualization()
 
 
@@ -125,13 +115,11 @@ class Hypervisor():
 
         while RobotUtils.SIMULATION_ENABLED:
 
-            # Update model
             vis.lock()
 
             self.PlanningWorldRobotInspector.update_torso_COM()
 
             if RobotUtils.PHYSICS_ENABLED:
-
                 if self.gravity_paused:
                     if self.HighLevelMotionController.initialization_complete:
                         self.sim.setGravity([0, 0, -9.8])
@@ -141,10 +129,12 @@ class Hypervisor():
                 self.HighLevelMotionController.control_loop()
                 self.sim.updateWorld()
                 self.sim.simulate(RobotUtils.CONTROLLER_DT)
-                self.StabilityManager.check_status()
+                self.SimWorldStabilityManager.check_status()
+
+            else:
+                self.PlannerWorldStabilityManager.check_status()
 
             vis.unlock()
-
             time.sleep(RobotUtils.CONTROLLER_DT)
             if not vis.shown():
                 sys.exit()

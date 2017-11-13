@@ -1,5 +1,6 @@
 import time
 import pygame
+from pygame.locals import *
 from ...Utilities.MotionThread.MotionThread import MotionThread
 from ...Utilities.RobotUtils.RobotUtils import RobotUtils
 
@@ -12,6 +13,7 @@ class UserInput(object):
         self.desired_robot_state = RobotUtils.BASE_STATE
         self.saved_robot_state_desired = self.desired_robot_state
         self.gampad_disconnected_status_printed  = False
+        self.print_config = False
 
         self.r_x = 0
         self.r_y = 0
@@ -34,7 +36,19 @@ class UserInput(object):
     def get_desired_robot_state(self):
         return self.desired_robot_state
 
+    def get_print_config(self):
+        if self.print_config:
+            self.print_config = False
+            return True
+        return False
+
     def update_desired_direction(self):
+
+        # Print Robot Config when joystick button is pressed
+        for event in pygame.event.get():
+            if event.type == pygame.JOYBUTTONDOWN:
+                self.print_config = True
+
 
         if not self.gamepad is None:
 
@@ -94,6 +108,11 @@ class UserInput(object):
                     # Base state desired
                     else:
                         self.desired_robot_state = RobotUtils.BASE_STATE
+
+            # Prevent unallowed states
+            if self.desired_robot_state not in RobotUtils.allowed_states:
+                self.desired_robot_state = RobotUtils.BASE_STATE
+
         else:
 
             if pygame.joystick.get_count() == 1:

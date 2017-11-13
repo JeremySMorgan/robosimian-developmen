@@ -7,8 +7,6 @@ from klampt.model import ik
 from klampt import vis
 import time
 from ...Utilities.RobotUtils.RobotUtils import RobotUtils
-from shapely.geometry import Point
-from shapely.geometry.polygon import Polygon
 
 class HighLevelMotionController(object):
 
@@ -113,7 +111,7 @@ class HighLevelMotionController(object):
             self.control_loop_calls = 0
             self.first_control_loop = True
 
-        print_str = "motion queue size: "+str(self.motion_queue.qsize())+ "measured controller dt:"+str(self.measured_controller_dt)
+        print_str = "motion queue size: "+str(self.motion_queue.qsize())+ ",\t measured dt:"+RobotUtils.pp_double(self.measured_controller_dt)
         #print print_str
         if not self.motion_queue.empty():
 
@@ -349,27 +347,8 @@ class HighLevelMotionController(object):
         if RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
             RobotUtils.ColorPrinter((self.__class__.__name__+"backward_walk()"), "Starting backward walk", "STANDARD")
 
-        translation = [-RobotUtils.TORSO_SHIFT_DELTA, 0, 0]
+        # Implement Here
 
-        f_back_extend_state = RobotUtils.LEG_B_EXTEND_STATE
-
-        cancelled = False
-
-        while 1:
-
-            for leg in RobotUtils.end_affectors:
-                if not self.make_leg_step_by_new_state(leg, f_back_extend_state, MotionThread): cancelled = True; break
-                if not self.make_leg_step_by_new_state(leg, f_back_extend_state, MotionThread): cancelled = True; break
-                if not self.make_leg_step_by_new_state(leg, f_back_extend_state, MotionThread): cancelled = True; break
-                if not self.make_leg_step_by_new_state(leg, f_back_extend_state, MotionThread): cancelled = True; break
-
-            if cancelled:
-                break
-
-            if not self.make_torso_shift_from_local_xyz_translation(translation, MotionThread): break
-
-        self.clear_motion_queue()
-        self.reset_to_base_state()
         self.motion_thread_currently_running = False
 
 
@@ -569,7 +548,7 @@ class HighLevelMotionController(object):
     #           - make_torso_shift_from_local_xyz_translation
 
 
-    def linear_leg_step_to_global_xyz_in_t(self, link_name, global_end_xyz, step_time, MotionThread=None, append_to_m_queue=True):
+    def linear_leg_step_to_global_xyz_in_t(self, link_name, global_end_xyz, step_time, MotionThread=None, append_to_m_queue=True, override_max_euclid_dist=False):
 
         """
         @param link_name: link name to move
@@ -594,9 +573,13 @@ class HighLevelMotionController(object):
 
         ik_max_deviation = RobotUtils.IK_MAX_DEVIATION
 
-        if RobotUtils.get_euclidian_diff(global_start_xyz, global_end_xyz) < RobotUtils.MINIMUM_DIST_TO_CAUSE_RESET:
-            #RobotUtils.ColorPrinter((self.__class__.__name__+".linear_leg_step_to_global_xyz_in_t():"),("Negiligble change for leg: "+link_name+", exiting function"), "STANDARD")
-            return True
+        if not override_max_euclid_dist:
+            euclidian_dif = RobotUtils.get_euclidian_diff(global_start_xyz, global_end_xyz)
+            print "euclidian dif for",link_name,":",RobotUtils.pp_double(euclidian_dif), " minumum to cause reset: ",RobotUtils.MINIMUM_DIST_TO_CAUSE_RESET
+            if euclidian_dif < RobotUtils.MINIMUM_DIST_TO_CAUSE_RESET:
+                print "RESET Triggered"
+                #RobotUtils.ColorPrinter((self.__class__.__name__+".linear_leg_step_to_global_xyz_in_t():"),("Negiligble change for leg: "+link_name+", exiting function"), "STANDARD")
+                return True
 
         t_start = time.time()
 
@@ -649,67 +632,10 @@ class HighLevelMotionController(object):
         @return: False if thread was suspended mid step. True otherwise
         """
 
-
-        #  [F_R_FOOT, F_L_FOOT, B_R_FOOT, B_L_FOOT]
-        self.link_currently_midstep[RobotUtils.end_affectors.index(link_name)] = True
-
-        link = self.get_end_affector_from_end_affector_name(link_name)
-
-        # Retrieve appropriate variables
-        active_dofs = self.get_active_dofs_from_end_affector_name(link_name)
-        desired_orientation = self.MotionPlanner.get_desired_end_affector_rotation(link_name)
-
-        # Time calculations
-        delay = self.measured_controller_dt
-        i_max = int( step_time / float(delay))
-
-        global_start_xyz = link.getWorldPosition([0, 0, 0])
         global_end_xyz = self.MotionPlanner.get_world_xyz_from_local_xyz(local_end_xyz)
 
-        ik_max_deviation = RobotUtils.IK_MAX_DEVIATION
+        return self.linear_leg_step_to_global_xyz_in_t(link_name, global_end_xyz, step_time, MotionThread, append_to_m_queue, override_max_euclid_dist)
 
-        if not override_max_euclid_dist:
-            if RobotUtils.get_euclidian_diff(global_start_xyz, global_end_xyz) < RobotUtils.MINIMUM_DIST_TO_CAUSE_RESET:
-                if RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
-                    RobotUtils.ColorPrinter((self.__class__.__name__+".linear_leg_step_to_local_xyz_in_t():"),("Negiligble change for leg:"+link_name+"Exiting function"), "STANDARD")
-                return True
-
-        t_start = time.time()
-
-        for i in range(i_max):
-
-
-            if MotionThread is None or ( (not MotionThread is None ) and MotionThread.is_alive()):
-
-                xyz_des = self.MotionPlanner.get_linear_mid_motion_xyz(global_start_xyz, global_end_xyz, i, i_max)
-                goal = ik.objective(link, R=desired_orientation, t=xyz_des)
-
-
-                res = ik.solve_nearby(goal, activeDofs=active_dofs, maxDeviation=ik_max_deviation,
-                                      feasibilityCheck=RobotUtils.always_true_func)
-
-                # Failed
-                if not res:
-                    RobotUtils.ColorPrinter((self.__class__.__name__+".linear_leg_step_to_local_xyz_in_t()"), "ik failure", "FAIL")
-
-                else:
-                    if append_to_m_queue:
-                        self.add_q_to_motion_queue(self.robosimian.getConfig())
-
-                time.sleep(delay)
-                delay = self.measured_controller_dt
-
-            else:
-                if RobotUtils.HIGH_LEVEL_MOTION_PLANNER_DEBUGGING_ENABLED:
-                    status = "Suspending motion thread for: " + link_name + " linear motion"
-                    RobotUtils.ColorPrinter(self.__class__.__name__, status, "FAIL")
-                return False
-
-        t_end =  time.time()
-        t_total = t_end - t_start
-        #print( ("Step took: "+str(t_total)+"seconds") )
-        self.link_currently_midstep[RobotUtils.end_affectors.index(link_name)] = False
-        return True
 
 
     def make_torso_shift_to_world_xyz(self, world_xyz, MotionThread=None):
