@@ -2,14 +2,15 @@ from klampt.model import trajectory
 import numpy as np
 from klampt import vis
 import time
-from ...Utilities.RobotUtils.RobotUtils import RobotUtils
+from ...Utilities.Logging.Logger import Logger
 
 class RobotInspector(object):
     
-    def __init__(self, robosimian, MotionPlanner, HighLevelMotionController):
+    def __init__(self, robosimian, MotionPlanner, HighLevelMotionController, RobotConstants):
         self.robosimian = robosimian
         self.MotionPlanner = MotionPlanner
         self.HighLevelMotionController = HighLevelMotionController
+        self.RobotConstants = RobotConstants
 
 
     def shift_xy_rotate_yaw_when_initialization_done(self):
@@ -22,7 +23,7 @@ class RobotInspector(object):
         self.rotate_yaw(degree=-5)
 
     def print_config(self):
-        print RobotUtils.pp_list(self.robosimian.getConfig())
+        print Logger.pp_list(self.robosimian.getConfig())
 
     def update_torso_COM(self):
 
@@ -30,12 +31,12 @@ class RobotInspector(object):
         y = self.robosimian.getConfig()[1]
         z = self.robosimian.getConfig()[2]
         center = [x, y, z]
-        ground = [x, y, z + RobotUtils.BASE_STATE_Z_DELTA]
+        ground = [x, y, z + self.RobotConstants.BASE_STATE_Z_DELTA]
         self.add_line_to_vis("torso xy", center, ground)
 
     def get_lr_distance(self):
-        fl = self.MotionPlanner.get_end_affector_from_end_affector_name(RobotUtils.F_L_FOOT)
-        fr = self.MotionPlanner.get_end_affector_from_end_affector_name(RobotUtils.F_R_FOOT)
+        fl = self.MotionPlanner.get_end_affector_from_end_affector_name(self.RobotConstants.F_L_FOOT)
+        fr = self.MotionPlanner.get_end_affector_from_end_affector_name(self.RobotConstants.F_R_FOOT)
 
         fl_xyz_w = fl.getWorldPosition([0,0,0])
         fr_xyz_w = fr.getWorldPosition([0, 0, 0])
@@ -46,21 +47,21 @@ class RobotInspector(object):
         delta_xyz_w = [fl_xyz_w[0] - fr_xyz_w[0], fl_xyz_w[1] - fr_xyz_w[1], fl_xyz_w[2] - fr_xyz_w[2]]
         delta_xyz_l = [fl_xyz_l[0] - fr_xyz_l[0], fl_xyz_l[1] - fr_xyz_l[1], fl_xyz_l[2] - fr_xyz_l[2]]
 
-        bs_y_delta = RobotUtils.BASE_STATE_Y_DELTA
-        shoulder_y = RobotUtils.SHOULDER_Y
+        bs_y_delta = self.RobotConstants.BASE_STATE_Y_DELTA
+        shoulder_y = self.RobotConstants.SHOULDER_Y
         sum_y       = bs_y_delta + shoulder_y
 
-        print "\nfl, fr  world:\t",RobotUtils.pp_list(fl_xyz_w), "\t", RobotUtils.pp_list(fr_xyz_w)
-        print "fl, fr  local:\t",RobotUtils.pp_list(fl_xyz_l), "\t", RobotUtils.pp_list(fr_xyz_l)
-        print "delta xyz world:",RobotUtils.pp_list(delta_xyz_w)
-        print "delta xyz local:",RobotUtils.pp_list(delta_xyz_l)
-        print "base state y delta, shoulder y, sum, 2x sum:",RobotUtils.pp_double(bs_y_delta),RobotUtils.pp_double(shoulder_y),RobotUtils.pp_double(sum_y),RobotUtils.pp_double(2*sum_y),"\n"
+        print "\nfl, fr  world:\t",Logger.pp_list(fl_xyz_w), "\t", Logger.pp_list(fr_xyz_w)
+        print "fl, fr  local:\t",Logger.pp_list(fl_xyz_l), "\t", Logger.pp_list(fr_xyz_l)
+        print "delta xyz world:",Logger.pp_list(delta_xyz_w)
+        print "delta xyz local:",Logger.pp_list(delta_xyz_l)
+        print "base state y delta, shoulder y, sum, 2x sum:",Logger.pp_double(bs_y_delta),Logger.pp_double(shoulder_y),Logger.pp_double(sum_y),Logger.pp_double(2*sum_y),"\n"
 
 
     def get_fb_distance(self):
 
-        fl = self.MotionPlanner.get_end_affector_from_end_affector_name(RobotUtils.F_L_FOOT)
-        bl = self.MotionPlanner.get_end_affector_from_end_affector_name(RobotUtils.B_L_FOOT)
+        fl = self.MotionPlanner.get_end_affector_from_end_affector_name(self.RobotConstants.F_L_FOOT)
+        bl = self.MotionPlanner.get_end_affector_from_end_affector_name(self.RobotConstants.B_L_FOOT)
 
         fl_xyz_w = fl.getWorldPosition([0, 0, 0])
         bl_xyz_w = bl.getWorldPosition([0, 0, 0])
@@ -71,15 +72,15 @@ class RobotInspector(object):
         delta_xyz_w = [fl_xyz_w[0] - bl_xyz_w[0], fl_xyz_w[1] - bl_xyz_w[1], fl_xyz_w[2] - bl_xyz_w[2]]
         delta_xyz_l = [fl_xyz_l[0] - bl_xyz_l[0], fl_xyz_l[1] - bl_xyz_l[1], fl_xyz_l[2] - bl_xyz_l[2]]
 
-        bs_x_delta = RobotUtils.BASE_STATE_X_DELTA
-        shoulder_x = RobotUtils.SHOULDER_X
+        bs_x_delta = self.RobotConstants.BASE_STATE_X_DELTA
+        shoulder_x = self.RobotConstants.SHOULDER_X
         sum_x = bs_x_delta + shoulder_x
 
-        print "\nfl, bl  world:\t", RobotUtils.pp_list(fl_xyz_w), "\t", RobotUtils.pp_list(bl_xyz_w)
-        print "fl, bl  local:\t", RobotUtils.pp_list(fl_xyz_l), "\t",RobotUtils.pp_list(bl_xyz_w)
-        print "delta xyz world:", RobotUtils.pp_list(delta_xyz_w)
-        print "delta xyz local:", RobotUtils.pp_list(delta_xyz_l)
-        print "base state x delta, shoulder x, sum, 2x sum:", RobotUtils.pp_double(bs_x_delta), RobotUtils.pp_double(shoulder_x), RobotUtils.pp_double(sum_x), RobotUtils.pp_double(2 * sum_x),"\n"
+        print "\nfl, bl  world:\t", Logger.pp_list(fl_xyz_w), "\t", Logger.pp_list(bl_xyz_w)
+        print "fl, bl  local:\t", Logger.pp_list(fl_xyz_l), "\t",Logger.pp_list(bl_xyz_w)
+        print "delta xyz world:", Logger.pp_list(delta_xyz_w)
+        print "delta xyz local:", Logger.pp_list(delta_xyz_l)
+        print "base state x delta, shoulder x, sum, 2x sum:", Logger.pp_double(bs_x_delta), Logger.pp_double(shoulder_x), Logger.pp_double(sum_x), Logger.pp_double(2 * sum_x),"\n"
 
 
 

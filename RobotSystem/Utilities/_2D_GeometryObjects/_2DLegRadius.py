@@ -96,8 +96,6 @@ class _2DLegRadius(object):
         return intersection_poly.centroid.coords[0]
 
 
-
-
     def _2d_center_point(self):
 
         '''
@@ -119,7 +117,7 @@ class _2DLegRadius(object):
         return self.shapely_poly.contains(point)
 
     def remove_visualization(self):
-        vis.remove(self.name)
+        vis.hide(self.name)
 
     def visualize(self):
 

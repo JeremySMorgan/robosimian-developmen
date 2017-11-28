@@ -1,5 +1,5 @@
 from klampt.model.collide import WorldCollider
-from ...Utilities.RobotUtils.RobotUtils import RobotUtils
+from ...Utilities.Logging.Logger import Logger
 
 class StabilityManager(object):
 
@@ -35,7 +35,7 @@ class StabilityManager(object):
 
             if torq_c > torq_m:
                 if i > 5:
-                    t_print_str += link_name + ": " + RobotUtils.pp_double(torq_c) + "> max: " + str(torq_m) + "\t"
+                    t_print_str += link_name + ": " + Logger.pp_double(torq_c) + "> max: " + str(torq_m) + "\t"
                     print_t = True
 
         if print_t:
@@ -49,7 +49,7 @@ class StabilityManager(object):
             link_1_name = collision[0].getName()
             link_2_name = collision[1].getName()
             error_str = "Collision detected between"+link_1_name+" and"+link_2_name
-            RobotUtils.ColorPrinter((self.__class__.__name__+".check_collisions()"),error_str,"FAIL" )
+            Logger.log((self.__class__.__name__+".check_collisions()"),error_str,"FAIL" )
 
 
 
@@ -66,7 +66,7 @@ class StabilityManager(object):
             vel_c = vel[i] if vel[i] > 0 else (-1) * vel[i]
             link_name = self.robosimian.link(i).getName()
             if vel_c > vel_m:
-                v_print_str += link_name + ": " + RobotUtils.pp_double(vel_c) + ", max: " + str( vel_m) + "\t| "
+                v_print_str += link_name + ": " + Logger.pp_double(vel_c) + ", max: " + str( vel_m) + "\t| "
                 print_v = True
 
         if print_v:

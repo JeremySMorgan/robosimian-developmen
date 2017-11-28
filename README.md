@@ -3,6 +3,14 @@
 ### About
 Walking gait for JPL's Robosimian quadruped robot (https://www.jpl.nasa.gov/news/news.php?feature=4603). Uses Klamp't (http://motion.pratt.duke.edu/klampt/) for simulation, ik, and modeling. Forward gait and reset algorithm ensure stability in all known input states. 
 
+
+### System Design
+
+This projects software is broken into two distinct sections: `RobotSubSystems` and `Utilities`. Packages in each of these sections are run by the `Hypervisor` to control the robot. 
+
+ 1. `RobotSubSystems`. classes in this packages access the robot's (and possibly the world's) state to calculate trajectories, monitor the robot, ect. Files include:
+	 1. `HighLevelMotionController`. This is a multi-threaded classes which sends commands to the low level controller (provided by Klamp't ) which is responsible for actual joint control. The control loop dequeues commands calculated by a sepperate thread which 
+
 ### Walking Algorithm
 
 
@@ -81,9 +89,9 @@ for back right end affector:
 
 ```
 
-![Reset Stage 1](https://github.com/JeremySMorgan/robosimian-gait-development/blob/master/torso_stage_1.png)
+![Reset Stage 1](https://github.com/JeremySMorgan/robosimian-gait-development/blob/master/media/torso_stage_1.png)
 
-![Reset Stage 1](https://github.com/JeremySMorgan/robosimian-gait-development/blob/master/reset_stage_2.png)
+![Reset Stage 1](https://github.com/JeremySMorgan/robosimian-gait-development/blob/master/media/reset_stage_2.png)
 
 
 
